@@ -600,6 +600,11 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	
 	
 	
+	Buffer bufferOutput = Buffer(context, CL_MEM_WRITE_ONLY, LIST_SIZE * sizeof(int));
+	
+	
+	
+	
 	/*
 	Buffer bufferCosine = Buffer(context, CL_MEM_READ_ONLY, size * sizeof(double));
 	Buffer bufferPY = Buffer(context, CL_MEM_READ_ONLY, size * sizeof(double));
@@ -614,11 +619,24 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	queue.enqueueWriteBuffer(bufferSine, CL_TRUE, 0, arraySize * sizeof(double), sine + videoParameters.activeVideoStart);
 	
 	
+	
 	kernel.setArg(0, bufferSine);
+	kernel.setArg(1, bufferOutput);
 	
 	NDRange global(1024);//LIST_SIZE
 	NDRange local(1);//1
 	queue.enqueueNDRangeKernel(kernel, NullRange, global, local);
+	
+	
+	
+	int *C = new int[arraySize];
+
+		
+	queue.enqueueReadBuffer(bufferC, CL_TRUE, 0, arraySize * sizeof(int), C);
+	
+	std::cout << C[11] << std::endl;
+	
+	
 	
 	
 	//std::cout << "did not crash!!!" << std::endl;
