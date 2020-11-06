@@ -47,6 +47,13 @@
 
 using namespace cl;
 
+
+bool hasFlag(cl_device_fp_config flags)
+{
+	return (flags&(CL_FP_FMA | CL_FP_ROUND_TO_NEAREST | CL_FP_ROUND_TO_ZERO | CL_FP_ROUND_TO_INF | CL_FP_INF_NAN | CL_FP_DENORM))!=0;
+	
+}
+
 std::vector<Device> devices;
 int find_devices() {
 	std::vector<Platform> platforms; // get all platforms
@@ -66,7 +73,25 @@ int find_devices() {
 		std::cout << "Error: There are no OpenCL devices available!" << std::endl;
 		return -1;
 	}
-	for (int i = 0; i < n; i++) std::cout << "ID: " << i << ", Device: " << devices[i].getInfo<CL_DEVICE_NAME>() << std::endl;
+	for (int i = 0; i < n; i++)
+	{
+		std::cout << "ID: " << i << ", Device: " << devices[i].getInfo<CL_DEVICE_NAME>() << std::endl;
+		cl_device_fp_config temp = devices[i].getInfo<CL_DEVICE_DOUBLE_FP_CONFIG>();
+		
+		
+		if (hasFlag(temp))
+		{
+			
+			std::cout << "flags supported" << std::endl;
+			
+		}
+		else
+		{
+			
+			std::cout << "flags not supported" << std::endl;
+		}
+		
+	}
 	return n; // return number of available devices
 }
 
