@@ -97,6 +97,7 @@ FORMS += \
 INCLUDEPATH += ../library/filter
 INCLUDEPATH += ../library/tbc
 INCLUDEPATH += ../ld-chroma-decoder
+INCLUDEPATH += /usr/local/cuda-11.1/include
 
 # Include git information definitions
 isEmpty(BRANCH) {
@@ -127,7 +128,9 @@ INCLUDEPATH += "/usr/local/include"
 # Normal open-source OS goodness
 INCLUDEPATH += "/usr/local/include/opencv"
 LIBS += -L"/usr/local/lib"
+LIBS += -L"/usr/local/cuda-11.1"
 LIBS += -lfftw3
+LIBS += -lOpenCL
 
 # Include the QWT library (used for charting)
 unix:!macx {

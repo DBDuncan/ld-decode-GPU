@@ -95,3 +95,4 @@ LIBS += -L"/usr/local/lib"
 LIBS += -L"/usr/local/cuda-11.1"
 LIBS += -lfftw3
 LIBS += -lOpenCL
+LIBS += -ggdb

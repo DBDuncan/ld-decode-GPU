@@ -39,8 +39,13 @@
 
 #include <array>
 #include <cassert>
+#include <iostream>
+#include <fstream>
 
 #include <CL/cl.hpp>
+
+using namespace cl;
+
 
 /*!
     \class PalColour
@@ -559,7 +564,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 			std::istreambuf_iterator<char>(sourceFile),
 			(std::istreambuf_iterator<char>()));
 		Program::Sources source(1, std::make_pair(sourceCode.c_str(), sourceCode.length() + 1));
-	
+
 		// Make program of the source code in the context
 		Program program = Program(context, source);
 
@@ -571,9 +576,10 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 
 
 
-		
+	int store = 0;	
 	int *prefilteredChroma;
 	
+	prefilteredChroma = &store;
 		
 	if (PREFILTERED_CHROMA)
 	{
@@ -615,7 +621,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	queue.enqueueNDRangeKernel(kernel, NullRange, global, local);
 	
 	
-	std::cout << "did not crash!!!" << std::endl;
+	//std::cout << "did not crash!!!" << std::endl;
 	
 	
 
