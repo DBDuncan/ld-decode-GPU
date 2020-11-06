@@ -40,6 +40,8 @@
 #include <array>
 #include <cassert>
 
+#include <CL/cl.hpp>
+
 /*!
     \class PalColour
 
@@ -380,6 +382,35 @@ template <typename ChromaSample, bool PREFILTERED_CHROMA>
 void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *chromaData, const LineInfo &line, double chromaGain,
                            RGBFrame &outputFrame)
 {
+	
+	
+		std::vector<Platform> platforms;
+		Platform::get(&platforms);
+
+		//platforms[0].
+
+		// Select the default platform and create a context using this platform and the GPU
+		cl_context_properties cps[3] = {
+			CL_CONTEXT_PLATFORM,
+			(cl_context_properties)(platforms[0])(),
+			0
+		};
+		Context context(CL_DEVICE_TYPE_GPU, cps);
+
+		// Get a list of devices on this platform
+		std::vector<Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
+
+		// Create a command queue and use the first device
+		CommandQueue queue = CommandQueue(context, devices[0]);
+	
+	
+	
+	
+	
+	
+	
+	
+	
     // Dummy black line, used when the filter needs to look outside the active region.
     static constexpr ChromaSample blackLine[MAX_WIDTH] = {0};
 
@@ -518,6 +549,75 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
     // extract the result with half its original amplitude, and with the
     // burst-based correction applied.
     const double scaledSaturation = 2.0 * scaledContrast * chromaGain;
+	
+	
+	
+	
+			// Read source file
+		std::ifstream sourceFile("calc_color.cl");
+		std::string sourceCode(
+			std::istreambuf_iterator<char>(sourceFile),
+			(std::istreambuf_iterator<char>()));
+		Program::Sources source(1, std::make_pair(sourceCode.c_str(), sourceCode.length() + 1));
+	
+		// Make program of the source code in the context
+		Program program = Program(context, source);
+
+		// Build program for these specific devices
+		program.build(devices);
+
+		// Make kernel
+		Kernel kernel(program, "vector_calc_color");
+
+
+
+		
+	int *prefilteredChroma;
+	
+		
+	if (PREFILTERED_CHROMA)
+	{
+		(*prefilteredChroma) = 1;
+	}
+	else
+	{
+		(*prefilteredChroma) = 0;
+	}
+	
+	int arraySize = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
+	
+	//Buffer bufferPreChroma = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(int));
+	//Buffer bufferComp = Buffer(context, CL_MEM_READ_ONLY, size * sizeof(unsigned short));
+	
+	Buffer bufferSine = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
+	
+	
+	
+	
+	/*
+	Buffer bufferCosine = Buffer(context, CL_MEM_READ_ONLY, size * sizeof(double));
+	Buffer bufferPY = Buffer(context, CL_MEM_READ_ONLY, size * sizeof(double));
+	Buffer bufferQY = Buffer(context, CL_MEM_READ_ONLY, size * sizeof(double));
+	Buffer bufferBlack16 = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(unsigned int));
+	Buffer bufferContrast = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(double));
+	Buffer bufferIn0 = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(double));
+	*/
+	
+	
+	
+	queue.enqueueWriteBuffer(bufferSine, CL_TRUE, 0, arraySize * sizeof(double), sine + videoParameters.activeVideoStart);
+	
+	
+	kernel.setArg(0, bufferSine);
+	
+	NDRange global(1024);//LIST_SIZE
+	NDRange local(1);//1
+	queue.enqueueNDRangeKernel(kernel, NullRange, global, local);
+	
+	
+	std::cout << "did not crash!!!" << std::endl;
+	
+	
 
     for (qint32 i = videoParameters.activeVideoStart; i < videoParameters.activeVideoEnd; i++) {
         // Compute luma by...
