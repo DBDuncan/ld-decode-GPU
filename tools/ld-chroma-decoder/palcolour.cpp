@@ -297,8 +297,10 @@ void PalColour::decodeField(const SourceField &inputField, const double *chromaD
 
         if (configuration.chromaFilter == palColourFilter) {
             // Decode chroma and luma from the composite signal
+		std::cout << "type first" << std::endl;
             decodeLine<quint16, false>(inputField, compPtr, line, chromaGain, outputFrame);
         } else {
+		std::cout << "type second" << std::endl;
             // Decode chroma and luma from the Transform PAL output
             decodeLine<double, true>(inputField, chromaData, line, chromaGain, outputFrame);
         }
@@ -601,14 +603,35 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	
 	
 	Buffer bufferOutput = Buffer(context, CL_MEM_WRITE_ONLY, arraySize * sizeof(double));
+	Buffer bufferOutputFinal = Buffer(context, CL_MEM_WRITE_ONLY, arraySize * sizeof(unsigned short) * 3);
 	
 	
 	
 	
-	/*
-	Buffer bufferCosine = Buffer(context, CL_MEM_READ_ONLY, size * sizeof(double));
-	Buffer bufferPY = Buffer(context, CL_MEM_READ_ONLY, size * sizeof(double));
-	Buffer bufferQY = Buffer(context, CL_MEM_READ_ONLY, size * sizeof(double));
+	
+	Buffer bufferCosine = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
+	
+	
+	Buffer bufferPY = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
+
+
+	Buffer bufferQY = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
+
+
+
+
+	Buffer bufferPU = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
+	Buffer bufferQU = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
+	Buffer bufferQV = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
+	Buffer bufferPV = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
+
+
+
+	Buffer bufferComp = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(unsigned short));
+	Buffer bufferIn0 = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(unsigned short));
+
+
+/*
 	Buffer bufferBlack16 = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(unsigned int));
 	Buffer bufferContrast = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(double));
 	Buffer bufferIn0 = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(double));
@@ -617,6 +640,18 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	
 	
 	queue.enqueueWriteBuffer(bufferSine, CL_TRUE, 0, arraySize * sizeof(double), sine + videoParameters.activeVideoStart);
+	queue.enqueueWriteBuffer(bufferCosine, CL_TRUE, 0, arraySize * sizeof(double), cosine + videoParameters.activeVideoStart);
+	queue.enqueueWriteBuffer(bufferPY, CL_TRUE, 0, arraySize * sizeof(double), py + videoParameters.activeVideoStart);
+	queue.enqueueWriteBuffer(bufferQY, CL_TRUE, 0, arraySize * sizeof(double), qy + videoParameters.activeVideoStart);
+	
+	queue.enqueueWriteBuffer(bufferPU, CL_TRUE, 0, arraySize * sizeof(double), pu + videoParameters.activeVideoStart);
+	queue.enqueueWriteBuffer(bufferQU, CL_TRUE, 0, arraySize * sizeof(double), qu + videoParameters.activeVideoStart);
+	queue.enqueueWriteBuffer(bufferQV, CL_TRUE, 0, arraySize * sizeof(double), qv + videoParameters.activeVideoStart);
+	queue.enqueueWriteBuffer(bufferPV, CL_TRUE, 0, arraySize * sizeof(double), pv + videoParameters.activeVideoStart);
+
+	queue.enqueueWriteBuffer(bufferComp, CL_TRUE, 0, arraySize * sizeof(unsigned short), comp + videoParameters.activeVideoStart);
+	queue.enqueueWriteBuffer(bufferIn0, CL_TRUE, 0, arraySize * sizeof(unsigned short), in0 + videoParameters.activeVideoStart);
+
 
 
 	//double *test = sine + videoParameters.activeVideoStart;
@@ -625,10 +660,44 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	
 	
 	kernel.setArg(0, bufferSine);
-	kernel.setArg(1, bufferOutput);
+	kernel.setArg(1, bufferCosine);
+	kernel.setArg(2, bufferPY);
+	kernel.setArg(3, bufferQY);
 	
-	NDRange global(1024);//LIST_SIZE
-	NDRange local(256);//1
+	kernel.setArg(4, bufferPU);
+	kernel.setArg(5, bufferQU);
+	kernel.setArg(6, bufferQV);
+	kernel.setArg(7, bufferPV);
+	kernel.setArg(8, bufferComp);
+	kernel.setArg(9, bufferIn0);
+	
+	
+	//setting single variables
+	if (PREFILTERED_CHROMA)
+	{
+		kernel.setArg(10, 1);
+	}
+	else
+	{
+		kernel.setArg(10, 0);
+	}
+	//kernel.setArg(10, 1);
+
+	kernel.setArg(11, videoParameters.black16bIre);
+	kernel.setArg(12, scaledContrast);
+	kernel.setArg(13, line.bp);
+	kernel.setArg(14, line.bq);
+	kernel.setArg(15, line.Vsw);
+	kernel.setArg(16, scaledSaturation);
+
+
+
+	
+	kernel.setArg(17, bufferOutput);
+	kernel.setArg(18, bufferOutputFinal);
+	
+	NDRange global(arraySize);//LIST_SIZE
+	NDRange local(1);//1
 	queue.enqueueNDRangeKernel(kernel, NullRange, global, local);
 	
 	
@@ -638,7 +707,17 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 		
 	queue.enqueueReadBuffer(bufferOutput, CL_TRUE, 0, arraySize * sizeof(double), C);
 	
-	//std::cout << C[1] << std::endl;
+	//std::cout << C[20] << std::endl;
+	
+
+
+
+	unsigned short *testOutput = new unsigned short[arraySize * 3];
+
+	queue.enqueueReadBuffer(bufferOutputFinal, CL_TRUE, 0, arraySize * sizeof(unsigned short) * 3, testOutput);
+
+
+	std::cout  << "Processed Output: "  << testOutput[200] << std::endl;
 	
 	
 	
@@ -682,4 +761,8 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
         ptr[pp + 1] = static_cast<quint16>(G);
         ptr[pp + 2] = static_cast<quint16>(B);
     }
+
+
+	std::cout <<  "Proper Output: " << ptr[(videoParameters.activeVideoStart * 3) + 200] << std::endl;
+
 }
