@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
 {
 
 find_devices();
-std::cout << "Hello World!!!4!! test four!!!!"  << std::endl;
+std::cout << "Helddlo World!!!4!! test four!!!!"  << std::endl;
 
 
     // Install the local debug message handler

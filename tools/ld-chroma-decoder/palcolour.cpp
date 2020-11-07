@@ -559,7 +559,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	
 	
 			// Read source file
-		std::ifstream sourceFile("calc_color.cl");
+		std::ifstream sourceFile("/home/duncan/Documents/github/ld-decode-GPU/tools/ld-chroma-decoder/calc_color.cl");
 		std::string sourceCode(
 			std::istreambuf_iterator<char>(sourceFile),
 			(std::istreambuf_iterator<char>()));
@@ -600,7 +600,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	
 	
 	
-	Buffer bufferOutput = Buffer(context, CL_MEM_WRITE_ONLY, LIST_SIZE * sizeof(int));
+	Buffer bufferOutput = Buffer(context, CL_MEM_WRITE_ONLY, arraySize * sizeof(double));
 	
 	
 	
@@ -617,24 +617,28 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	
 	
 	queue.enqueueWriteBuffer(bufferSine, CL_TRUE, 0, arraySize * sizeof(double), sine + videoParameters.activeVideoStart);
-	
+
+
+	//double *test = sine + videoParameters.activeVideoStart;
+
+	//std::cout << "base value: "  << sine[videoParameters.activeVideoStart + 200] << std::endl;	
 	
 	
 	kernel.setArg(0, bufferSine);
 	kernel.setArg(1, bufferOutput);
 	
 	NDRange global(1024);//LIST_SIZE
-	NDRange local(1);//1
+	NDRange local(256);//1
 	queue.enqueueNDRangeKernel(kernel, NullRange, global, local);
 	
 	
 	
-	int *C = new int[arraySize];
+	double *C = new double[arraySize];
 
 		
-	queue.enqueueReadBuffer(bufferC, CL_TRUE, 0, arraySize * sizeof(int), C);
+	queue.enqueueReadBuffer(bufferOutput, CL_TRUE, 0, arraySize * sizeof(double), C);
 	
-	std::cout << C[11] << std::endl;
+	//std::cout << C[1] << std::endl;
 	
 	
 	
