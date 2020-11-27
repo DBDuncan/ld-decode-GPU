@@ -42,7 +42,7 @@
 #include "palcolour.h"
 #include "paldecoder.h"
 #include "transformpal.h"
-
+/*
 #include <CL/cl.hpp>
 
 using namespace cl;
@@ -96,7 +96,7 @@ int find_devices() {
 }
 
 
-
+*/
 
 
 // Load the thresholds file for the Transform decoders, if specified. We must
@@ -152,8 +152,8 @@ static bool loadTransformThresholds(QCommandLineParser &parser, QCommandLineOpti
 int main(int argc, char *argv[])
 {
 
-find_devices();
-std::cout << "Helddlo World!!!4!! test four!!!!"  << std::endl;
+//find_devices();
+//std::cout << "Helddlo World!!!4!! test four!!!!"  << std::endl;
 
 
     // Install the local debug message handler

@@ -74,7 +74,9 @@ __global unsigned short *outputFinal
 	//printf("%f\n", A[0]);
 	//double test = 454.444; 
 	//output[i] = 125.453 + i;
-	output[i] = 999;
+
+	const double holdTest = -(pu[i] * bp + qu[i] * bq) * scaledSaturation;
+	output[i] = holdTest;
 
 
 
@@ -96,7 +98,7 @@ __global unsigned short *outputFinal
 
 
 	const double rU = -(pu[i] * bp + qu[i] * bq) * scaledSaturation;
-	const double rV = Vsw * (qv[i] * bp - pv[i] * bq) * scaledSaturation;
+	const double rV = Vsw * -(qv[i] * bp - pv[i] * bq) * scaledSaturation;
 
 
 	const double R = boundVal(0.0, rY + (1.139883 * rV), 65535.0);
