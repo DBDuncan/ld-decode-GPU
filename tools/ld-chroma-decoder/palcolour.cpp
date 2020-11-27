@@ -297,10 +297,10 @@ void PalColour::decodeField(const SourceField &inputField, const double *chromaD
 
         if (configuration.chromaFilter == palColourFilter) {
             // Decode chroma and luma from the composite signal
-		std::cout << "type first" << std::endl;
+		//std::cout << "type first" << std::endl;
             decodeLine<quint16, false>(inputField, compPtr, line, chromaGain, outputFrame);
         } else {
-		std::cout << "type second" << std::endl;
+		//std::cout << "type second" << std::endl;
             // Decode chroma and luma from the Transform PAL output
             decodeLine<double, true>(inputField, chromaData, line, chromaGain, outputFrame);
         }
@@ -630,7 +630,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	Buffer bufferComp = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(unsigned short));
 	Buffer bufferIn0 = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(unsigned short));
 
-
+//do not want or need
 /*
 	Buffer bufferBlack16 = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(unsigned int));
 	Buffer bufferContrast = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(double));
@@ -716,16 +716,16 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 
 	queue.enqueueReadBuffer(bufferOutputFinal, CL_TRUE, 0, arraySize * sizeof(unsigned short) * 3, testOutput);
 
+	//std::cout << "new:" << std::endl;
+	//std::cout  << "Processed Output: "  << testOutput[203] << std::endl;
+	
+	//std::cout << "GPU rU" << C[20] << std::endl;
 
-	std::cout  << "Processed Output: "  << testOutput[200] << std::endl;
-	
-	
-	
 	
 	//std::cout << "did not crash!!!" << std::endl;
 	
-	
-
+/*	
+	//double rU = 0;;
     for (qint32 i = videoParameters.activeVideoStart; i < videoParameters.activeVideoEnd; i++) {
         // Compute luma by...
         double rY;
@@ -761,8 +761,16 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
         ptr[pp + 1] = static_cast<quint16>(G);
         ptr[pp + 2] = static_cast<quint16>(B);
     }
+*/
+
+	//std::cout <<  "Proper Output: " << ptr[(videoParameters.activeVideoStart * 3) + 203] << std::endl;
 
 
-	std::cout <<  "Proper Output: " << ptr[(videoParameters.activeVideoStart * 3) + 200] << std::endl;
+
+	//std::cout << "correct RU" << rU << std::endl;
+
+	std::copy(testOutput, testOutput + arraySize * 3, ptr + (videoParameters.activeVideoStart * 3));
+
+
 
 }
