@@ -391,24 +391,31 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 {
 	
 	
-		std::vector<Platform> platforms;
-		Platform::get(&platforms);
+	//boiler plate code here setting up to use the GPU.
+	//while working, it is very ineficient due to setting up the GPU
+	//and recompiling the kernel every line of frame. This
+	//only needs to be done once, but for proof of concept,
+	//is fine being here for now.
+	
+	
+	std::vector<Platform> platforms;
+	Platform::get(&platforms);
 
-		//platforms[0].
+	//platforms[0].
 
-		// Select the default platform and create a context using this platform and the GPU
-		cl_context_properties cps[3] = {
-			CL_CONTEXT_PLATFORM,
-			(cl_context_properties)(platforms[0])(),
-			0
-		};
-		Context context(CL_DEVICE_TYPE_GPU, cps);
+	// Select the default platform and create a context using this platform and the GPU
+	cl_context_properties cps[3] = {
+		CL_CONTEXT_PLATFORM,
+		(cl_context_properties)(platforms[0])(),
+		0
+	};
+	Context context(CL_DEVICE_TYPE_GPU, cps);
 
-		// Get a list of devices on this platform
-		std::vector<Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
+	// Get a list of devices on this platform
+	std::vector<Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-		// Create a command queue and use the first device
-		CommandQueue queue = CommandQueue(context, devices[0]);
+	// Create a command queue and use the first device
+	CommandQueue queue = CommandQueue(context, devices[0]);
 	
 	
 	
@@ -558,23 +565,23 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
     const double scaledSaturation = 2.0 * scaledContrast * chromaGain;
 	
 	
+	//code compiling the kernel for use on the GPU.
 	
-	
-			// Read source file
-		std::ifstream sourceFile("/home/duncan/Documents/github/ld-decode-GPU/tools/ld-chroma-decoder/calc_color.cl");
-		std::string sourceCode(
-			std::istreambuf_iterator<char>(sourceFile),
-			(std::istreambuf_iterator<char>()));
-		Program::Sources source(1, std::make_pair(sourceCode.c_str(), sourceCode.length() + 1));
+	// Read source file
+	std::ifstream sourceFile("/home/duncan/Documents/github/ld-decode-GPU/tools/ld-chroma-decoder/calc_color.cl");
+	std::string sourceCode(
+		std::istreambuf_iterator<char>(sourceFile),
+		(std::istreambuf_iterator<char>()));
+	Program::Sources source(1, std::make_pair(sourceCode.c_str(), sourceCode.length() + 1));
 
-		// Make program of the source code in the context
-		Program program = Program(context, source);
+	// Make program of the source code in the context
+	Program program = Program(context, source);
 
-		// Build program for these specific devices
-		program.build(devices);
+	// Build program for these specific devices
+	program.build(devices);
 
-		// Make kernel
-		Kernel kernel(program, "vector_calc_color");
+	// Make kernel
+	Kernel kernel(program, "vector_calc_color");
 
 
 
@@ -594,51 +601,26 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	
 	int arraySize = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
 	
-	//Buffer bufferPreChroma = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(int));
-	//Buffer bufferComp = Buffer(context, CL_MEM_READ_ONLY, size * sizeof(unsigned short));
-	
+
+	//create buffers to transfer data to GPU
 	Buffer bufferSine = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-	
-	
-	
-	
 	Buffer bufferOutput = Buffer(context, CL_MEM_WRITE_ONLY, arraySize * sizeof(double));
 	Buffer bufferOutputFinal = Buffer(context, CL_MEM_WRITE_ONLY, arraySize * sizeof(unsigned short) * 3);
-	
-	
-	
-	
-	
 	Buffer bufferCosine = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-	
-	
 	Buffer bufferPY = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-
-
 	Buffer bufferQY = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-
-
-
-
 	Buffer bufferPU = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
 	Buffer bufferQU = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
 	Buffer bufferQV = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
 	Buffer bufferPV = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-
-
-
 	Buffer bufferComp = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(unsigned short));
 	Buffer bufferIn0 = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(unsigned short));
 
-//do not want or need
-/*
-	Buffer bufferBlack16 = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(unsigned int));
-	Buffer bufferContrast = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(double));
-	Buffer bufferIn0 = Buffer(context, CL_MEM_READ_ONLY, 1 * sizeof(double));
-	*/
+
+
+
 	
-	
-	
+	//transfer data to the gpu
 	queue.enqueueWriteBuffer(bufferSine, CL_TRUE, 0, arraySize * sizeof(double), sine + videoParameters.activeVideoStart);
 	queue.enqueueWriteBuffer(bufferCosine, CL_TRUE, 0, arraySize * sizeof(double), cosine + videoParameters.activeVideoStart);
 	queue.enqueueWriteBuffer(bufferPY, CL_TRUE, 0, arraySize * sizeof(double), py + videoParameters.activeVideoStart);
@@ -658,7 +640,9 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 
 	//std::cout << "base value: "  << sine[videoParameters.activeVideoStart + 200] << std::endl;	
 	
-	
+	//setup arguments for kernel function on gpu
+	//there should be much fewer arguments being send to the GPU later
+	//cause the whole frame of data to be decoded will be sent.
 	kernel.setArg(0, bufferSine);
 	kernel.setArg(1, bufferCosine);
 	kernel.setArg(2, bufferPY);
@@ -681,7 +665,6 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	{
 		kernel.setArg(10, 0);
 	}
-	//kernel.setArg(10, 1);
 
 	kernel.setArg(11, videoParameters.black16bIre);
 	kernel.setArg(12, scaledContrast);
@@ -689,31 +672,34 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	kernel.setArg(14, line.bq);
 	kernel.setArg(15, line.Vsw);
 	kernel.setArg(16, scaledSaturation);
-
-
-
 	
 	kernel.setArg(17, bufferOutput);
 	kernel.setArg(18, bufferOutputFinal);
 	
+	//setting work group sizes. Not likely to be set to the most efficient sizes at the moment.
 	NDRange global(arraySize);//LIST_SIZE
 	NDRange local(1);//1
 	queue.enqueueNDRangeKernel(kernel, NullRange, global, local);
 	
 	
+	//at the moment two arrays are copied out, one with the decoded data
+	//and another with every item in the array set to a set number
+	//this is because it is not always obvious if the kernel is crashing
+	//and testing the kernel is outputing a set value makes sure that it at least
+	//did not crash. for some reason on windows in visual studio it does alert me 
+	//if the kernel crashes. idk why not in linux.
+	
+	
 	
 	double *C = new double[arraySize];
-
-		
 	queue.enqueueReadBuffer(bufferOutput, CL_TRUE, 0, arraySize * sizeof(double), C);
 	
 	//std::cout << C[20] << std::endl;
 	
 
 
-
+	//copying the decoded data out.
 	unsigned short *testOutput = new unsigned short[arraySize * 3];
-
 	queue.enqueueReadBuffer(bufferOutputFinal, CL_TRUE, 0, arraySize * sizeof(unsigned short) * 3, testOutput);
 
 	//std::cout << "new:" << std::endl;
@@ -769,6 +755,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 
 	//std::cout << "correct RU" << rU << std::endl;
 
+	//copy data gotten from GPU to output array
 	std::copy(testOutput, testOutput + arraySize * 3, ptr + (videoParameters.activeVideoStart * 3));
 
 
