@@ -32,8 +32,8 @@
 #include <fstream>
 #include <iostream>
 
-#include <cassert>
-#include <CL/sycl.hpp>
+//#include <cassert>
+//#include <CL/sycl.hpp>
 
 #include "decoderpool.h"
 #include "lddecodemetadata.h"
@@ -46,8 +46,9 @@
 #include "paldecoder.h"
 #include "transformpal.h"
 
-using data_type = float;
+//using data_type = float;
 
+/*
 std::vector<data_type> add(cl::sycl::queue& q,
                            const std::vector<data_type>& a,
                            const std::vector<data_type>& b)
@@ -87,7 +88,7 @@ std::vector<data_type> add(cl::sycl::queue& q,
   return c;
 }
 
-
+*/
 
 
 
@@ -207,7 +208,7 @@ static bool loadTransformThresholds(QCommandLineParser &parser, QCommandLineOpti
 }
 
 
-
+/*
 void syclTest()
 {
 
@@ -226,17 +227,17 @@ void syclTest()
     std::cout << x << std::endl;
 
 }
-
+*/
 
 int main(int argc, char *argv[])
 {
 
 //find_devices();
-std::cout << "Helddlo World!!!5!! test four!!!!"  << std::endl;
+//std::cout << "Helddlo World!!!5!! test four!!!!"  << std::endl;
 
 
 
-syclTest();
+//syclTest();
 
 
 
