@@ -1,7 +1,14 @@
 QT -= gui
 
-CONFIG += c++11 console
+CONFIG += c++17 console
 CONFIG -= app_bundle
+
+QMAKE_CXX = /opt/hipSYCL/bin/syclcc-clang
+
+QMAKE_CXXFLAGS += --hipsycl-gpu-arch=sm_52
+
+QMAKE_CXXFLAGS += --hipsycl-platform=cuda
+
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -65,7 +72,7 @@ HEADERS += \
 # Add external includes to the include path
 INCLUDEPATH += ../library/filter
 INCLUDEPATH += ../library/tbc
-INCLUDEPATH += /usr/local/cuda-11.1/include
+#INCLUDEPATH += /usr/local/cuda-11.1/include
 
 # Include git information definitions
 isEmpty(BRANCH) {
@@ -92,7 +99,7 @@ INCLUDEPATH += "/usr/local/include"
 
 # Normal open-source OS goodness
 LIBS += -L"/usr/local/lib"
-LIBS += -L"/usr/local/cuda-11.1"
+#LIBS += -L"/usr/local/cuda-11.1"
 LIBS += -lfftw3
 LIBS += -lOpenCL
 LIBS += -ggdb

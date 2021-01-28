@@ -32,6 +32,9 @@
 #include <fstream>
 #include <iostream>
 
+#include <cassert>
+#include <CL/sycl.hpp>
+
 #include "decoderpool.h"
 #include "lddecodemetadata.h"
 #include "logging.h"
@@ -42,6 +45,60 @@
 #include "palcolour.h"
 #include "paldecoder.h"
 #include "transformpal.h"
+
+using data_type = float;
+
+std::vector<data_type> add(cl::sycl::queue& q,
+                           const std::vector<data_type>& a,
+                           const std::vector<data_type>& b)
+{
+  std::vector<data_type> c(a.size());
+
+  assert(a.size() == b.size());
+  cl::sycl::range<1> work_items{a.size()};
+
+  {
+    cl::sycl::buffer<data_type> buff_a(a.data(), a.size());
+    cl::sycl::buffer<data_type> buff_b(b.data(), b.size());
+    cl::sycl::buffer<data_type> buff_c(c.data(), c.size());
+        std::cout << "got here" << std::endl;
+
+
+    q.submit([&](cl::sycl::handler& cgh){
+      auto access_a = buff_a.get_access<cl::sycl::access::mode::read>(cgh);
+      auto access_b = buff_b.get_access<cl::sycl::access::mode::read>(cgh);
+      auto access_c = buff_c.get_access<cl::sycl::access::mode::write>(cgh);
+                std::cout << "got here" << std::endl;
+
+
+
+      cgh.parallel_for<class vector_add>(work_items, [=] (cl::sycl::id<1> tid) {
+        access_c[tid] = access_a[tid] + access_b[tid];
+        //access_c[tid] = 5;
+        });
+
+
+
+    });
+  }
+
+        c.push_back(6);
+
+  return c;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 /*
 #include <CL/cl.hpp>
 
@@ -149,11 +206,52 @@ static bool loadTransformThresholds(QCommandLineParser &parser, QCommandLineOpti
     return true;
 }
 
+
+
+void syclTest()
+{
+
+  cl::sycl::queue q;
+  std::vector<data_type> a = {1.f, 2.f, 3.f, 4.f};
+  std::vector<data_type> b = {-5.f, 2.f, -3.f, 4.f};
+  auto result = add(q, a, b);
+
+
+        std::cout << "test2" << std::endl;
+//std::cout << device.get_info<info::device::name> << std::endl;
+
+
+  std::cout << "Result: " << std::endl;
+  for(const auto x: result)
+    std::cout << x << std::endl;
+
+}
+
+
 int main(int argc, char *argv[])
 {
 
 //find_devices();
-//std::cout << "Helddlo World!!!4!! test four!!!!"  << std::endl;
+std::cout << "Helddlo World!!!5!! test four!!!!"  << std::endl;
+
+
+
+syclTest();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     // Install the local debug message handler
