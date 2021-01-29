@@ -232,11 +232,11 @@ int main(int argc, char *argv[])
 {
 
 //find_devices();
-std::cout << "Helddlo World!!!5!! test four!!!!"  << std::endl;
+//std::cout << "Helddlo World!!!5!! test four!!!!"  << std::endl;
 
 
 
-syclTest();
+//syclTest();
 
 
 

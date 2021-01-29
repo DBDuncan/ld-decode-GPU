@@ -568,7 +568,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	//code compiling the kernel for use on the GPU.
 	
 	// Read source file
-	std::ifstream sourceFile("calc_color.cl");
+	std::ifstream sourceFile("/home/duncan/Documents/github/ld-decode-GPU/tools/ld-chroma-decoder/calc_color.cl");
 	std::string sourceCode(
 		std::istreambuf_iterator<char>(sourceFile),
 		(std::istreambuf_iterator<char>()));
