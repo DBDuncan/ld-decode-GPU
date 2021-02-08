@@ -42,9 +42,16 @@
 #include <iostream>
 #include <fstream>
 
-#include <CL/cl.hpp>
+//#include <CL/cl.hpp>
 
-using namespace cl;
+//#include <CL/sycl.hpp>
+
+//using namespace cl;
+
+#include "lddecodemetadata.h"
+
+
+#include "palDecoderGPU.h"
 
 
 /*!
@@ -258,7 +265,8 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
     QVector<const double *> chromaData(endIndex - startIndex);
     if (configuration.chromaFilter != palColourFilter) {
         // Use Transform PAL filter to extract chroma
-        transformPal->filterFields(inputFields, startIndex, endIndex, chromaData);
+        std::cout << "notpalcolorfilter" << std::endl;
+	transformPal->filterFields(inputFields, startIndex, endIndex, chromaData);
     }
 
     // Resize and clear the output buffers
@@ -272,6 +280,12 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
     for (qint32 i = startIndex, j = 0, k = 0; i < endIndex; i += 2, j += 2, k++) {
         decodeField(inputFields[i], chromaData[j], chromaGain, outputFrames[k]);
         decodeField(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k]);
+
+
+	//std::cout << typeid(videoParameters).name() << std::endl;
+	decodeFieldGPU(inputFields[i], chromaData[j], chromaGain, outputFrames[k], videoParameters, sine, cosine);
+	decodeFieldGPU(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k], videoParameters, sine, cosine);
+
     }
 
     if (configuration.showFFTs && configuration.chromaFilter != palColourFilter) {
@@ -281,6 +295,9 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
     }
 }
 
+int numt = 0;
+
+
 // Decode one field into outputFrame
 void PalColour::decodeField(const SourceField &inputField, const double *chromaData, double chromaGain, RGBFrame &outputFrame)
 {
@@ -289,6 +306,12 @@ void PalColour::decodeField(const SourceField &inputField, const double *chromaD
 
     const qint32 firstLine = inputField.getFirstActiveLine(videoParameters);
     const qint32 lastLine = inputField.getLastActiveLine(videoParameters);
+
+	//std::cout << "start range: " << firstLine << std::endl;
+	//std::cout << "end range: " << lastLine << std::endl;
+
+	numt = 0;
+
     for (qint32 fieldLine = firstLine; fieldLine < lastLine; fieldLine++) {
         LineInfo line(fieldLine);
 
@@ -312,6 +335,9 @@ PalColour::LineInfo::LineInfo(qint32 _number)
 {
 }
 
+
+
+
 // Detect the colourburst on a line.
 // Stores the burst details into line.
 void PalColour::detectBurst(LineInfo &line, const quint16 *inputData)
@@ -329,6 +355,17 @@ void PalColour::detectBurst(LineInfo &line, const quint16 *inputData)
     in2 = (line.number + 1) >= videoParameters.fieldHeight ? blackLine : (inputData + ((line.number + 1) * videoParameters.fieldWidth));
     in3 = (line.number - 2) <  0                           ? blackLine : (inputData + ((line.number - 2) * videoParameters.fieldWidth));
     in4 = (line.number + 2) >= videoParameters.fieldHeight ? blackLine : (inputData + ((line.number + 2) * videoParameters.fieldWidth));
+
+	if (numt == 0)
+	std::cout << "real value: " << *in0 << std::endl;
+
+numt = 1;
+
+
+//if (line.number == 22)
+	//std::cout << "line zero: " << in0[0] << std::endl;
+
+
 
     // Find absolute burst phase relative to the reference carrier by
     // product detection.
@@ -379,6 +416,14 @@ void PalColour::detectBurst(LineInfo &line, const quint16 *inputData)
     const double burstNorm = qMax(sqrt(line.bp * line.bp + line.bq * line.bq), 130000.0 / 128);
     line.bp /= burstNorm;
     line.bq /= burstNorm;
+
+
+
+	if (line.number == 22)
+		std::cout << "real bq num: " << line.bq << std::endl;
+
+
+
 }
 
 // Decode one line into outputFrame.
@@ -397,7 +442,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	//only needs to be done once, but for proof of concept,
 	//is fine being here for now.
 	
-	
+/*	
 	std::vector<Platform> platforms;
 	Platform::get(&platforms);
 
@@ -416,7 +461,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 
 	// Create a command queue and use the first device
 	CommandQueue queue = CommandQueue(context, devices[0]);
-	
+*/	
 	
 	
 	
@@ -564,7 +609,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
     // burst-based correction applied.
     const double scaledSaturation = 2.0 * scaledContrast * chromaGain;
 	
-	
+/*	
 	//code compiling the kernel for use on the GPU.
 	
 	// Read source file
@@ -709,9 +754,12 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 
 	
 	//std::cout << "did not crash!!!" << std::endl;
+*/	
 	
-/*	
 	//double rU = 0;;
+
+	//std::cout << "length: " << videoParameters.activeVideoEnd - videoParameters.activeVideoStart << std::endl;
+
     for (qint32 i = videoParameters.activeVideoStart; i < videoParameters.activeVideoEnd; i++) {
         // Compute luma by...
         double rY;
@@ -747,7 +795,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
         ptr[pp + 1] = static_cast<quint16>(G);
         ptr[pp + 2] = static_cast<quint16>(B);
     }
-*/
+
 
 	//std::cout <<  "Proper Output: " << ptr[(videoParameters.activeVideoStart * 3) + 203] << std::endl;
 
@@ -756,7 +804,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	//std::cout << "correct RU" << rU << std::endl;
 
 	//copy data gotten from GPU to output array
-	std::copy(testOutput, testOutput + arraySize * 3, ptr + (videoParameters.activeVideoStart * 3));
+	//std::copy(testOutput, testOutput + arraySize * 3, ptr + (videoParameters.activeVideoStart * 3));
 
 
 

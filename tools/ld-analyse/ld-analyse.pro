@@ -45,6 +45,7 @@ SOURCES += \
     ../ld-chroma-decoder/transformpal3d.cpp \
     ../ld-chroma-decoder/framecanvas.cpp \
     ../ld-chroma-decoder/sourcefield.cpp \
+    ../ld-chroma-decoder/palDecoderGPU.cpp \
     ../library/tbc/lddecodemetadata.cpp \
     ../library/tbc/sourcevideo.cpp \
     ../library/tbc/vbidecoder.cpp \
@@ -74,6 +75,7 @@ HEADERS += \
     ../ld-chroma-decoder/transformpal3d.h \
     ../ld-chroma-decoder/framecanvas.h \
     ../ld-chroma-decoder/sourcefield.h \
+    ../ld-chroma-decoder/palDecoderGPU.h \
     ../library/filter/firfilter.h \
     ../library/tbc/lddecodemetadata.h \
     ../library/tbc/sourcevideo.h \
