@@ -265,7 +265,7 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
     QVector<const double *> chromaData(endIndex - startIndex);
     if (configuration.chromaFilter != palColourFilter) {
         // Use Transform PAL filter to extract chroma
-        std::cout << "notpalcolorfilter" << std::endl;
+        //std::cout << "notpalcolorfilter" << std::endl;
 	transformPal->filterFields(inputFields, startIndex, endIndex, chromaData);
     }
 
@@ -278,13 +278,13 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
 
     const double chromaGain = configuration.chromaGain;
     for (qint32 i = startIndex, j = 0, k = 0; i < endIndex; i += 2, j += 2, k++) {
-        decodeField(inputFields[i], chromaData[j], chromaGain, outputFrames[k]);
-        decodeField(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k]);
+        //decodeField(inputFields[i], chromaData[j], chromaGain, outputFrames[k]);
+        //decodeField(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k]);
 
 
-	//std::cout << typeid(videoParameters).name() << std::endl;
-	decodeFieldGPU(inputFields[i], chromaData[j], chromaGain, outputFrames[k], videoParameters, sine, cosine);
-	decodeFieldGPU(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k], videoParameters, sine, cosine);
+				//std::cout << typeid(videoParameters).name() << std::endl;
+				decodeFieldGPU(inputFields[i], chromaData[j], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
+				decodeFieldGPU(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
 
     }
 
@@ -296,7 +296,9 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
 }
 
 int numt = 0;
-
+int numtt = 0;
+int numttt = 0;
+int numtttt = 0;
 
 // Decode one field into outputFrame
 void PalColour::decodeField(const SourceField &inputField, const double *chromaData, double chromaGain, RGBFrame &outputFrame)
@@ -311,6 +313,12 @@ void PalColour::decodeField(const SourceField &inputField, const double *chromaD
 	//std::cout << "end range: " << lastLine << std::endl;
 
 	numt = 0;
+	numtt = 0;
+	numttt = 0;
+	numtttt = 0;
+
+	//std::cout << "Number of Lines::: " << lastLine - firstLine << std::endl;
+
 
     for (qint32 fieldLine = firstLine; fieldLine < lastLine; fieldLine++) {
         LineInfo line(fieldLine);
@@ -357,7 +365,7 @@ void PalColour::detectBurst(LineInfo &line, const quint16 *inputData)
     in4 = (line.number + 2) >= videoParameters.fieldHeight ? blackLine : (inputData + ((line.number + 2) * videoParameters.fieldWidth));
 
 	if (numt == 0)
-	std::cout << "real value: " << *in0 << std::endl;
+	//std::cout << "real value: " << *in0 << std::endl;
 
 numt = 1;
 
@@ -419,8 +427,8 @@ numt = 1;
 
 
 
-	if (line.number == 22)
-		std::cout << "real bq num: " << line.bq << std::endl;
+	//if (line.number == 22)
+		//std::cout << "real bq num: " << line.bq << std::endl;
 
 
 
@@ -465,7 +473,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 	
 	
 	
-	
+	double m[4][MAX_WIDTH], n[4][MAX_WIDTH];
 	
 	
 	
@@ -541,7 +549,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
         //
         // Vertical taps 1 and 2 are swapped in the array to save one addition
         // in the filter loop, as U and V use the same sign for taps 0 and 2.
-        double m[4][MAX_WIDTH], n[4][MAX_WIDTH];
+        //double m[4][MAX_WIDTH], n[4][MAX_WIDTH];
         for (qint32 i = videoParameters.activeVideoStart - FILTER_SIZE; i < videoParameters.activeVideoEnd + FILTER_SIZE + 1; i++) {
             m[0][i] =  in0[i] * sine[i];
             m[2][i] =  in1[i] * sine[i] - in2[i] * sine[i];
@@ -553,6 +561,14 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
             n[1][i] = -in3[i] * cosine[i] - in4[i] * cosine[i];
             n[3][i] = -in5[i] * cosine[i] + in6[i] * cosine[i];
         }
+
+				if (numtt == 150)
+				{
+					//std::cout << "the M number: " << n[0][500] << std::endl;
+					numtt = 1;				
+				}
+
+				numtt++;
 
         // p & q should be sine/cosine components' amplitudes
         // NB: Multiline averaging/filtering assumes perfect
@@ -593,6 +609,18 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
             qy[i] = QY;
         }
     }
+
+		if (numttt == 0)
+		{
+			//std::cout << "REAL PU NUM: " << pu[200] << std::endl;
+			//std::cout << "REA: FILT NUM: " << yfilt[5][1] << std::endl;
+			numttt = 999;
+
+		}
+
+		numttt++;
+
+
 
     // Pointer to composite signal data
     const quint16 *comp = inputField.data.data() + (line.number * videoParameters.fieldWidth);
@@ -794,7 +822,59 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
         ptr[pp + 0] = static_cast<quint16>(R);
         ptr[pp + 1] = static_cast<quint16>(G);
         ptr[pp + 2] = static_cast<quint16>(B);
+
+			
+
+				if (numtttt == 250)
+				{
+
+					if (i == videoParameters.activeVideoStart + 500)
+						{
+	
+							std::cout << "Real Red Pixel Value: " << R << std::endl;
+							std::cout << "Real Green Pixel Value: " << G << std::endl;
+							std::cout << "Real Blue Pixel Value: " << B << std::endl;
+							std::cout << "bp: " << line.bp << std::endl;
+							std::cout << "bq: " << line.bq << std::endl;
+							std::cout << "Vsw: " << line.Vsw << std::endl;
+							std::cout << "In0: " << in0[i] << std::endl;
+							std::cout << "In1: " << in1[i] << std::endl;
+							std::cout << "In2: " << in2[i] << std::endl;
+							std::cout << "In3: " << in3[i] << std::endl;
+							std::cout << "In4: " << in4[i] << std::endl;
+							std::cout << "In5: " << in5[i] << std::endl;
+							std::cout << "In6: " << in6[i] << std::endl;
+							std::cout << "M1: " << m[0][i] << std::endl;
+              std::cout << "M2: " << m[1][i] << std::endl;
+              std::cout << "M3: " << m[2][i] << std::endl;
+              std::cout << "M4: " << m[3][i] << std::endl;
+              std::cout << "N1: " << n[0][i] << std::endl;
+              std::cout << "N2: " << n[1][i] << std::endl;
+              std::cout << "N3: " << n[2][i] << std::endl;
+              std::cout << "N4: " << n[3][i] << std::endl;
+
+							std::cout << "pu: " << pu[i] << std::endl;
+              std::cout << "qu: " << qu[i] << std::endl;
+              std::cout << "pv: " << pv[i] << std::endl;
+              std::cout << "qv: " << qv[i] << std::endl;
+              std::cout << "py: " << py[i] << std::endl;
+              std::cout << "qy: " << qy[i] << std::endl;
+
+							std::cout << "Cfilt value: " << cfilt[6][1] << std::endl;;
+							
+							numtttt = 999;
+						}
+
+				}
+
+
+
     }
+
+
+	numtttt++;
+
+
 
 
 	//std::cout <<  "Proper Output: " << ptr[(videoParameters.activeVideoStart * 3) + 203] << std::endl;
