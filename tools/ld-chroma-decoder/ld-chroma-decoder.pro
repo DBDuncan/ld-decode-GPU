@@ -39,6 +39,7 @@ SOURCES += \
     transformpal2d.cpp \
     transformpal3d.cpp \
     palDecoderGPU.cpp \
+	ntseDecoderGPU.cpp \
     ../library/tbc/lddecodemetadata.cpp \
     ../library/tbc/sourcevideo.cpp \
     ../library/tbc/vbidecoder.cpp \
@@ -62,6 +63,7 @@ HEADERS += \
     transformpal3d.h \
     yiq.h \
     palDecoderGPU.h \
+	ntseDecoderGPU.h \
     ../library/filter/deemp.h \
     ../library/filter/firfilter.h \
     ../library/filter/iirfilter.h \

@@ -30,6 +30,13 @@
 
 #include <QScopedPointer>
 
+#include <iostream>
+
+
+#include "ntseDecoderGPU.h"
+
+
+
 // Definitions of static constexpr data members, for compatibility with
 // pre-C++17 compilers
 constexpr qint32 Comb::MAX_WIDTH;
@@ -112,14 +119,17 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
 {
     assert(configurationSet);
     assert((outputFrames.size() * 2) == (endIndex - startIndex));
+	
+	//std::cout << "big test" << std::endl;
+
 
     // Buffers for the next, current and previous frame.
     // Because we only need three of these, we allocate them upfront then
     // rotate the pointers below.
     QScopedPointer<FrameBuffer> nextFrameBuffer, currentFrameBuffer, previousFrameBuffer;
-    nextFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
+    //nextFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
     currentFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
-    previousFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
+    //previousFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
 
     // Decode each pair of fields into a frame.
     // To support 3D operation, where we need to see three input frames at a time,
@@ -129,56 +139,95 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
     for (qint32 fieldIndex = preStartIndex; fieldIndex < endIndex; fieldIndex += 2) {
         const qint32 frameIndex = (fieldIndex - startIndex) / 2;
 
-        // Rotate the buffers
+
+		//std::cout << "a frame " << std::endl;
+		
+		//decodeFrameGPU(inputFields[fieldIndex + 2], inputFields[fieldIndex + 3], outputFrames[frameIndex], videoParameters);
+        
+		//std::cout << "----------------------------- CPU DATA -----------------------" << std::endl;
+
+		// Rotate the buffers
         {
-            QScopedPointer<FrameBuffer> recycle(previousFrameBuffer.take());
-            previousFrameBuffer.reset(currentFrameBuffer.take());
-            currentFrameBuffer.reset(nextFrameBuffer.take());
-            nextFrameBuffer.reset(recycle.take());
+            //QScopedPointer<FrameBuffer> recycle(previousFrameBuffer.take());
+            //previousFrameBuffer.reset(currentFrameBuffer.take());
+            //currentFrameBuffer.reset(nextFrameBuffer.take());
+            //nextFrameBuffer.reset(recycle.take());
         }
 
         // If there's another input field, bring it into nextFrameBuffer
         if (fieldIndex + 3 < inputFields.size()) {
             // Load fields into the buffer
-            nextFrameBuffer->loadFields(inputFields[fieldIndex + 2], inputFields[fieldIndex + 3]);
+            //nextFrameBuffer->loadFields(inputFields[fieldIndex + 2], inputFields[fieldIndex + 3]);
 
             // Extract chroma using 1D filter
-            nextFrameBuffer->split1D();
+            //nextFrameBuffer->split1D();
 
             // Extract chroma using 2D filter
-            nextFrameBuffer->split2D();
+            //nextFrameBuffer->split2D();
+
+			//std::cout << "colour value: " << nextFrameBuffer->clpbuffer[0].pixel[200][200] << std::endl;
+
         }
 
         if (fieldIndex < startIndex) {
+			//std::cout << "look behind frame" << std::endl;
             // This is a look-behind frame; no further decoding needed.
             continue;
         }
 
         if (configuration.dimensions == 3) {
             // Extract chroma using 3D filter
+			std::cout << "is using 3d filter" << std::endl;
             currentFrameBuffer->split3D(*previousFrameBuffer, *nextFrameBuffer);
         }
 
         // Demodulate chroma giving I/Q
-        currentFrameBuffer->splitIQ();
+        //currentFrameBuffer->splitIQ();
 
         // Extract Y from baseband and I/Q
-        currentFrameBuffer->adjustY();
+        //currentFrameBuffer->adjustY();
 
         // Post-filter I/Q
-        if (configuration.colorlpf) currentFrameBuffer->filterIQ();
+        if (configuration.colorlpf) 
+		{
+			std::cout << "doint filterIQ" << std::endl;
+			//currentFrameBuffer->filterIQ();
+		}
+
+		//std::cout << "current before filters YIQ Y: " << currentFrameBuffer->yiqBuffer[200][200].y << std::endl;
+        //std::cout << "current before filters YIQ I: " << currentFrameBuffer->yiqBuffer[200][200].i << std::endl;
+        //std::cout << "current before filters YIQ Q: " << currentFrameBuffer->yiqBuffer[200][200].q << std::endl;
+
 
         // Apply noise reduction
-        currentFrameBuffer->doYNR();
-        currentFrameBuffer->doCNR();
+        //currentFrameBuffer->doYNR();
+        //currentFrameBuffer->doCNR();
 
         // Convert the YIQ result to RGB
-        outputFrames[frameIndex] = currentFrameBuffer->yiqToRgbFrame();
+        //outputFrames[frameIndex] = currentFrameBuffer->yiqToRgbFrame();
 
         // Overlay the map if required
         if (configuration.dimensions == 3 && configuration.showMap) {
             currentFrameBuffer->overlayMap(*previousFrameBuffer, *nextFrameBuffer, outputFrames[frameIndex]);
         }
+
+		//std::cout << "a frame " << std::endl;
+
+
+		//linenumber then hoz
+		//std::cout << "----------------------------- CPU DATA -----------------------" << std::endl;
+		//std::cout << "current colour value: " << currentFrameBuffer->clpbuffer[0].pixel[200][200] << std::endl;
+		//std::cout << "current 2d colour value: " << currentFrameBuffer->clpbuffer[1].pixel[200][200] << std::endl;
+		//std::cout << "current YIQ Y: " << currentFrameBuffer->yiqBuffer[200][200].y << std::endl;
+		//std::cout << "current YIQ I: " << currentFrameBuffer->yiqBuffer[200][200].i << std::endl;
+		//std::cout << "current YIQ Q: " << currentFrameBuffer->yiqBuffer[200][200].q << std::endl;
+
+
+
+		// was +2 and +3
+		decodeFrameGPU(inputFields[fieldIndex], inputFields[fieldIndex + 1], outputFrames[frameIndex], videoParameters, currentFrameBuffer->rawbuffer, configuration.yNRLevel, currentFrameBuffer->irescale, configuration.chromaGain, configuration.whitePoint75);
+
+
     }
 }
 
@@ -632,7 +681,13 @@ void Comb::FrameBuffer::doCNR()
 
 void Comb::FrameBuffer::doYNR()
 {
-    if (configuration.yNRLevel == 0) return;
+    if (configuration.yNRLevel == 0)
+	{
+		std::cout << "yNR Level is zero" << std::endl;
+		return;
+	}
+
+
 
     // High-pass filter for Y
     auto yFilter(f_nr);
@@ -654,10 +709,11 @@ void Comb::FrameBuffer::doYNR()
             double a = hplinef[h + 12].y;
 
             if (fabs(a) > nr_y) {
-                a = (a > 0) ? nr_y : -nr_y;
+                //a = (a > 0) ? nr_y : -nr_y;
             }
 
-            yiqBuffer[lineNumber][h].y -= a;
+			//was -= a;
+            yiqBuffer[lineNumber][h].y -= a;//yFilter.a[1];
         }
     }
 }

@@ -102,37 +102,43 @@ private:
         RGBFrame yiqToRgbFrame();
         void overlayMap(const FrameBuffer &previousFrame, const FrameBuffer &nextFrame, RGBFrame &rgbOutputFrame);
 
-    private:
+    public:
         const LdDecodeMetaData::VideoParameters &videoParameters;
-        const Configuration &configuration;
-
+    public:
+		const Configuration &configuration;
+	private:
         // Calculated frame height
         qint32 frameHeight;
 
+	public:
         // IRE scaling
         double irescale;
 
+	public:
         // Baseband samples (interlaced to form a complete frame)
         SourceVideo::Data rawbuffer;
-
+	private:
         // Chroma phase of the frame's two fields
         qint32 firstFieldPhaseID;
         qint32 secondFieldPhaseID;
 
+	public:
         // 1D, 2D and 3D-filtered chroma samples
         struct {
             double pixel[MAX_HEIGHT][MAX_WIDTH];
         } clpbuffer[3];
 
+	private:
         // Result of evaluating a 3D candidate
         struct Candidate {
             double penalty;
             double sample;
         };
 
+	public:
         // Demodulated YIQ samples
         YIQ yiqBuffer[MAX_HEIGHT][MAX_WIDTH];
-
+	private:
         inline qint32 getFieldID(qint32 lineNumber) const;
         inline bool getLinePhase(qint32 lineNumber) const;
         void getBestCandidate(qint32 lineNumber, qint32 h,

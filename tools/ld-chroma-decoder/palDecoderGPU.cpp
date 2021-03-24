@@ -21,7 +21,18 @@
 
 //a change
 
+__host__ __device__
+double opti(double num1, double num2)
+{
 
+	#ifdef SYCL_DEVICE_ONLY
+		#ifdef HIPSYCL_PLATFORM_CUDA
+		__syncthreads();
+		return max(num1, num2);
+		#endif
+	#endif
+	
+}
 
 
 void decodeFieldGPU(const SourceField &inputField, const double *chromaData, double chromaGain, RGBFrame &outputFrame)
@@ -75,8 +86,8 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 	//std::cout << "Line Width: " <<videoParameters.activeVideoEnd - videoParameters.activeVideoStart << std::endl;
 
-  const qint32 firstLine = inputField.getFirstActiveLine(videoParameters);
-  const qint32 lastLine = inputField.getLastActiveLine(videoParameters);
+  	const qint32 firstLine = inputField.getFirstActiveLine(videoParameters);
+  	const qint32 lastLine = inputField.getLastActiveLine(videoParameters);
 	//22 310
 
 
@@ -151,6 +162,8 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 		cl::sycl::buffer<double, 2> bufPU{cl::sycl::range<2>(288, 1135)};//was 1135 288
 
 
+		cl::sycl::buffer<LdDecodeMetaData::VideoParameters> bufVideoPara(&videoParameters, cl::sycl::range<1>(1));
+
 //keep for easy output of GPU device on system
 //std::cout << "Running on "
         //<< myQueue.get_device().get_info<cl::sycl::info::device::name>()
@@ -203,10 +216,13 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 			auto accessYfilt = bufYfilt.get_access<cl::sycl::access::mode::read>(cgh); 
 
 			//accessor of output
-			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::read_write>(cgh);
+			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::read_write>(cgh);//changed from read_write
 
 			//test accessor of PU
 			auto accessPU = bufPU.get_access<cl::sycl::access::mode::read_write>(cgh);
+
+
+			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
 
 
 			cgh.parallel_for<class vector_chroma>(cl::sycl::range<1>{lines.size()}, [=](cl::sycl::item<1> tid)
@@ -231,63 +247,62 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 
 				// Get pointers to the surrounding lines of input data.
-    		// If a line we need is outside the field, use blackLine instead.
-    		// (Unlike below, we don't need to stay in the active area, since we're
-    		// only looking at the colourburst.)
-    		const unsigned short *in0, *in1, *in2, *in3, *in4;
-    		in0 =                                                                 pointerInputData +  (fullLineNum      * videoParameters.fieldWidth);
-    		in1 = (fullLineNum - 1) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 1) * videoParameters.fieldWidth));
-    		in2 = (fullLineNum + 1) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 1) * videoParameters.fieldWidth));
-    		in3 = (fullLineNum - 2) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 2) * videoParameters.fieldWidth));
-    		in4 = (fullLineNum + 2) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 2) * videoParameters.fieldWidth));
+    			// If a line we need is outside the field, use blackLine instead.
+    			// (Unlike below, we don't need to stay in the active area, since we're
+    			// only looking at the colourburst.)
+    			const unsigned short *in0, *in1, *in2, *in3, *in4;
+    			in0 =                                                                 pointerInputData +  (fullLineNum      * accessVideoPara[0].fieldWidth);
+    			in1 = (fullLineNum - 1) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 1) * accessVideoPara[0].fieldWidth));
+    			in2 = (fullLineNum + 1) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 1) * accessVideoPara[0].fieldWidth));
+    			in3 = (fullLineNum - 2) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 2) * accessVideoPara[0].fieldWidth));
+    			in4 = (fullLineNum + 2) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 2) * accessVideoPara[0].fieldWidth));
 
 
 
 
 
-    		double bp = 0.0, bq = 0.0, bpo = 0.0, bqo = 0.0;
+    			double bp = 0.0, bq = 0.0, bpo = 0.0, bqo = 0.0;
 
-    		for (unsigned int i = videoParameters.colourBurstStart; i < videoParameters.colourBurstEnd; i++) {
-        	bp += ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessSine[i];
-       	 	bq += ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessCosine[i];
-        	bpo += ((in2[i] - in1[i]) / 2.0) * accessSine[i];
-        	bqo += ((in2[i] - in1[i]) / 2.0) * accessCosine[i];
-    		}
-
-
-   			// Normalise the sums above
-    		const unsigned int colourBurstLength = videoParameters.colourBurstEnd - videoParameters.colourBurstStart;
-    		bp /= colourBurstLength;
-    		bq /= colourBurstLength;
-    		bpo /= colourBurstLength;
-    		bqo /= colourBurstLength;
+    			for (unsigned int i = accessVideoPara[0].colourBurstStart; i < accessVideoPara[0].colourBurstEnd; i++) {
+        		bp += ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessSine[i];
+       	 		bq += ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessCosine[i];
+        		bpo += ((in2[i] - in1[i]) / 2.0) * accessSine[i];
+        		bqo += ((in2[i] - in1[i]) / 2.0) * accessCosine[i];
+    			}
 
 
+   				// Normalise the sums above
+    			const unsigned int colourBurstLength = accessVideoPara[0].colourBurstEnd - accessVideoPara[0].colourBurstStart;
+    			bp /= colourBurstLength;
+    			bq /= colourBurstLength;
+    			bpo /= colourBurstLength;
+    			bqo /= colourBurstLength;
 
 
 
-    		accessLineInfo[lineNum].Vsw = -1;
 
 
-    		if ((((bp - bpo) * (bp - bpo) + (bq - bqo) * (bq - bqo)) < (bp * bp + bq * bq) * 2))
+    			accessLineInfo[lineNum].Vsw = -1;
+
+
+    			if ((((bp - bpo) * (bp - bpo) + (bq - bqo) * (bq - bqo)) < (bp * bp + bq * bq) * 2))
 				{
-        	accessLineInfo[lineNum].Vsw = 1;
+        			accessLineInfo[lineNum].Vsw = 1;
 				}
 
 
 
-    		// Average the burst phase to get -U (reference) phase out -- burst
-    		// phase is (-U +/-V). bp and bq will be of the order of 1000.
-    		accessLineInfo[lineNum].bp = (bp - bqo) / 2;
-    		accessLineInfo[lineNum].bq = (bq + bpo) / 2;
+    			// Average the burst phase to get -U (reference) phase out -- burst
+    			// phase is (-U +/-V). bp and bq will be of the order of 1000.
+    			accessLineInfo[lineNum].bp = (bp - bqo) / 2;
+    			accessLineInfo[lineNum].bq = (bq + bpo) / 2;
 
-    		// Normalise the magnitude of the bp/bq vector to 1.
-    		// Kill colour if burst too weak.
-    		// XXX magic number 130000 !!! check!
-    		const double burstNorm = cl::sycl::max(cl::sycl::sqrt(accessLineInfo[lineNum].bp * accessLineInfo[lineNum].bp + accessLineInfo[lineNum].bq * accessLineInfo[lineNum].bq), 130000.0 / 128);
-    		accessLineInfo[lineNum].bp /= burstNorm;
-    		accessLineInfo[lineNum].bq /= burstNorm;
-
+    			// Normalise the magnitude of the bp/bq vector to 1.
+    			// Kill colour if burst too weak.
+    			// XXX magic number 130000 !!! check!
+    			const double burstNorm = cl::sycl::max(cl::sycl::sqrt(accessLineInfo[lineNum].bp * accessLineInfo[lineNum].bp + accessLineInfo[lineNum].bq * accessLineInfo[lineNum].bq), 130000.0 / 128);
+    			accessLineInfo[lineNum].bp /= burstNorm;
+    			accessLineInfo[lineNum].bq /= burstNorm;
 
 
 
@@ -298,26 +313,26 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 				//static constexpr unsigned int blackLine[1135] = {0};
 
-    		// Get pointers to the surrounding lines of input data.
-    		// If a line we need is outside the active area, use blackLine instead.
-    		const qint32 firstLine2 = inputField.getFirstActiveLine(videoParameters);
-    		const qint32 lastLine2 = inputField.getLastActiveLine(videoParameters);
-    		const unsigned short *in0Two, *in1Two, *in2Two, *in3Two, *in4Two, *in5Two, *in6Two;
-    		in0Two =                                               pointerInputData +  (fullLineNum      * videoParameters.fieldWidth);
-    		in1Two = (fullLineNum - 1) <  firstLine2 ? blackLine : (pointerInputData + ((fullLineNum - 1) * videoParameters.fieldWidth));
-    		in2Two = (fullLineNum + 1) >= lastLine2  ? blackLine : (pointerInputData + ((fullLineNum + 1) * videoParameters.fieldWidth));
-    		in3Two = (fullLineNum - 2) <  firstLine2 ? blackLine : (pointerInputData + ((fullLineNum - 2) * videoParameters.fieldWidth));
-    		in4Two = (fullLineNum + 2) >= lastLine2  ? blackLine : (pointerInputData + ((fullLineNum + 2) * videoParameters.fieldWidth));
-    		in5Two = (fullLineNum - 2) <  firstLine2 ? blackLine : (pointerInputData + ((fullLineNum - 3) * videoParameters.fieldWidth));
-    		in6Two = (fullLineNum + 3) >= lastLine2  ? blackLine : (pointerInputData + ((fullLineNum + 3) * videoParameters.fieldWidth));
+    			// Get pointers to the surrounding lines of input data.
+    			// If a line we need is outside the active area, use blackLine instead.
+    			const qint32 firstLine2 = inputField.getFirstActiveLine(videoParameters);//look into replacing with accessors
+    			const qint32 lastLine2 = inputField.getLastActiveLine(videoParameters);
+    			const unsigned short *in0Two, *in1Two, *in2Two, *in3Two, *in4Two, *in5Two, *in6Two;
+    			in0Two =                                               pointerInputData +  (fullLineNum      * accessVideoPara[0].fieldWidth);
+    			in1Two = (fullLineNum - 1) <  firstLine2 ? blackLine : (pointerInputData + ((fullLineNum - 1) * accessVideoPara[0].fieldWidth));
+    			in2Two = (fullLineNum + 1) >= lastLine2  ? blackLine : (pointerInputData + ((fullLineNum + 1) * accessVideoPara[0].fieldWidth));
+    			in3Two = (fullLineNum - 2) <  firstLine2 ? blackLine : (pointerInputData + ((fullLineNum - 2) * accessVideoPara[0].fieldWidth));
+    			in4Two = (fullLineNum + 2) >= lastLine2  ? blackLine : (pointerInputData + ((fullLineNum + 2) * accessVideoPara[0].fieldWidth));
+    			in5Two = (fullLineNum - 2) <  firstLine2 ? blackLine : (pointerInputData + ((fullLineNum - 3) * accessVideoPara[0].fieldWidth));
+    			in6Two = (fullLineNum + 3) >= lastLine2  ? blackLine : (pointerInputData + ((fullLineNum + 3) * accessVideoPara[0].fieldWidth));
 
-     		accessInInfo[lineNum].in0 = in0Two;
-    	 	accessInInfo[lineNum].in1 = in1Two;
-     		accessInInfo[lineNum].in2 = in2Two;
-     		accessInInfo[lineNum].in3 = in3Two;
-     		accessInInfo[lineNum].in4 = in4Two;
-     		accessInInfo[lineNum].in5 = in5Two;
-     		accessInInfo[lineNum].in6 = in6Two;
+     			accessInInfo[lineNum].in0 = in0Two;
+    	 		accessInInfo[lineNum].in1 = in1Two;
+     			accessInInfo[lineNum].in2 = in2Two;
+     			accessInInfo[lineNum].in3 = in3Two;
+     			accessInInfo[lineNum].in4 = in4Two;
+     			accessInInfo[lineNum].in5 = in5Two;
+     			accessInInfo[lineNum].in6 = in6Two;
 
 
 				//test code
@@ -325,13 +340,16 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 				{
 
 					//access_c[0] = bp;//in0[0];
-					access_c[1] = (lineNum + accessFirstLineNum[0])      * videoParameters.fieldWidth;
+					access_c[1] = (lineNum + accessFirstLineNum[0])      * accessVideoPara[0].fieldWidth;
 					//access_c[0] = 5.0;
-				access_c[2] = lineNum + accessFirstLineNum[0];
+					access_c[2] = lineNum + accessFirstLineNum[0];
 					//access_c[3] = in0[0];
 				}
 
 			});
+
+			//this cuda function works here!!!!!
+			//cudaDeviceSynchronize();
 
 		const size_t lineWidthCustom = videoParameters.activeVideoEnd - videoParameters.activeVideoStart + 1 + 7;
 
@@ -340,19 +358,19 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 			int line = tid.get_id(0);
 			//plus active video start for offset
-			int col = tid.get_id(1) + videoParameters.activeVideoStart - 7;
+			int col = tid.get_id(1) + accessVideoPara[0].activeVideoStart - 7;
 			
 
 
-      accessM[0][col][line] =  accessInInfo[line].in0[col] * accessSine[col];
-      accessM[2][col][line] =  accessInInfo[line].in1[col] * accessSine[col] - accessInInfo[line].in2[col] * accessSine[col];
-      accessM[1][col][line] = -accessInInfo[line].in3[col] * accessSine[col] - accessInInfo[line].in4[col] * accessSine[col];
-      accessM[3][col][line] = -accessInInfo[line].in5[col] * accessSine[col] + accessInInfo[line].in6[col] * accessSine[col];
+      		accessM[0][col][line] =  accessInInfo[line].in0[col] * accessSine[col];
+      		accessM[2][col][line] =  accessInInfo[line].in1[col] * accessSine[col] - accessInInfo[line].in2[col] * accessSine[col];
+      		accessM[1][col][line] = -accessInInfo[line].in3[col] * accessSine[col] - accessInInfo[line].in4[col] * accessSine[col];
+      		accessM[3][col][line] = -accessInInfo[line].in5[col] * accessSine[col] + accessInInfo[line].in6[col] * accessSine[col];
 
-      accessN[0][col][line] =  accessInInfo[line].in0[col] * accessCosine[col];
-      accessN[2][col][line] =  accessInInfo[line].in1[col] * accessCosine[col] - accessInInfo[line].in2[col] * accessCosine[col];
-      accessN[1][col][line] = -accessInInfo[line].in3[col] * accessCosine[col] - accessInInfo[line].in4[col] * accessCosine[col];
-      accessN[3][col][line] = -accessInInfo[line].in5[col] * accessCosine[col] + accessInInfo[line].in6[col] * accessCosine[col];
+      		accessN[0][col][line] =  accessInInfo[line].in0[col] * accessCosine[col];
+      		accessN[2][col][line] =  accessInInfo[line].in1[col] * accessCosine[col] - accessInInfo[line].in2[col] * accessCosine[col];
+      		accessN[1][col][line] = -accessInInfo[line].in3[col] * accessCosine[col] - accessInInfo[line].in4[col] * accessCosine[col];
+      		accessN[3][col][line] = -accessInInfo[line].in5[col] * accessCosine[col] + accessInInfo[line].in6[col] * accessCosine[col];
 
 		});
 
@@ -370,20 +388,19 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 		//std::cout << "Number of Lines:::>>>>" << lines.size() << std::endl;
 
 
-
-      cgh.parallel_for<class decodeImageStageTwo>(cl::sycl::range<2>{lines.size(), 1135}, [=](cl::sycl::item<2> tid)
-      {	
+		cgh.parallel_for<class decodeImageStageTwo>(cl::sycl::range<2>{lines.size(), 1135}, [=](cl::sycl::item<2> tid)
+		{	
 
 			
-				double testValue = 0.0;
-				int i = tid.get_id(1) + videoParameters.activeVideoStart;
-				int lineNum = tid.get_id(0);
+			double testValue = 0.0;
+			int i = tid.get_id(1) + accessVideoPara[0].activeVideoStart;
+			int lineNum = tid.get_id(0);
 
-				double QU = 0.0, PV = 0.0, QV = 0.0, PY = 0.0, QY = 0.0, PU = 0.0;
+			double QU = 0.0, PV = 0.0, QV = 0.0, PY = 0.0, QY = 0.0, PU = 0.0;
 
-				double newPU;
+			double newPU;
 
-				int startTwo = 0;
+			int startTwo = 0;
 
 					//for (int i = videoParameters.activeVideoStart; i < videoParameters.activeVideoEnd; i++) {
 
@@ -401,29 +418,29 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
              // forward/backward axis slant.
 
 
-						int start = 0;
-						int offset = 28;
+			int start = 0;
+			int offset = 28;
 
 
-						startTwo = 0;
+			startTwo = 0;
 
-             for (int b = 0; b <= 7; b++) {
-                 int l = i - b;
-                 int r = i + b;
+			for (int b = 0; b <= 7; b++) {
+            	int l = i - b;
+				int r = i + b;
 
-                 PY += (accessM[0][r][lineNum] + accessM[0][l][lineNum]) * accessYfilt[b][0] + (accessM[1][r][lineNum] + accessM[1][l][lineNum]) * accessYfilt[b][1];
+				PY += (accessM[0][r][lineNum] + accessM[0][l][lineNum]) * accessYfilt[b][0] + (accessM[1][r][lineNum] + accessM[1][l][lineNum]) * accessYfilt[b][1];
 
-                 QY += (accessN[0][r][lineNum] + accessN[0][l][lineNum]) * accessYfilt[b][0] + (accessN[1][r][lineNum] + accessN[1][l][lineNum]) * accessYfilt[b][1];
-
-
-
+				QY += (accessN[0][r][lineNum] + accessN[0][l][lineNum]) * accessYfilt[b][0] + (accessN[1][r][lineNum] + accessN[1][l][lineNum]) * accessYfilt[b][1];
 
 
 
 
 
-									PU += (accessM[0][r][lineNum] + accessM[0][l][lineNum]) * accessCfilt[b][0] + (accessM[1][r][lineNum] + accessM[1][l][lineNum]) * accessCfilt[b][1]
-                          + (accessN[2][r][lineNum] + accessN[2][l][lineNum]) * accessCfilt[b][2] + (accessN[3][r][lineNum] + accessN[3][l][lineNum]) * accessCfilt[b][3];
+
+
+
+				PU += (accessM[0][r][lineNum] + accessM[0][l][lineNum]) * accessCfilt[b][0] + (accessM[1][r][lineNum] + accessM[1][l][lineNum]) * accessCfilt[b][1]
+					+ (accessN[2][r][lineNum] + accessN[2][l][lineNum]) * accessCfilt[b][2] + (accessN[3][r][lineNum] + accessN[3][l][lineNum]) * accessCfilt[b][3];
 
 
 
@@ -432,86 +449,113 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 									//testValue = i;
 
 
-                 QU += (accessN[0][r][lineNum] + accessN[0][l][lineNum]) * accessCfilt[b][0] + (accessN[1][r][lineNum] + accessN[1][l][lineNum]) * accessCfilt[b][1]
+				QU += (accessN[0][r][lineNum] + accessN[0][l][lineNum]) * accessCfilt[b][0] + (accessN[1][r][lineNum] + accessN[1][l][lineNum]) * accessCfilt[b][1]
                          - (accessM[2][r][lineNum] + accessM[2][l][lineNum]) * accessCfilt[b][2] - (accessM[3][r][lineNum] + accessM[3][l][lineNum]) * accessCfilt[b][3];
                  
 								 PV += (accessM[0][r][lineNum] + accessM[0][l][lineNum]) * accessCfilt[b][0] + (accessM[1][r][lineNum] + accessM[1][l][lineNum]) * accessCfilt[b][1]
                          - (accessN[2][r][lineNum] + accessN[2][l][lineNum]) * accessCfilt[b][2] - (accessN[3][r][lineNum] + accessN[3][l][lineNum]) * accessCfilt[b][3];
 
-                 QV += (accessN[0][r][lineNum] + accessN[0][l][lineNum]) * accessCfilt[b][0] + (accessN[1][r][lineNum] + accessN[1][l][lineNum]) * accessCfilt[b][1]
+				QV += (accessN[0][r][lineNum] + accessN[0][l][lineNum]) * accessCfilt[b][0] + (accessN[1][r][lineNum] + accessN[1][l][lineNum]) * accessCfilt[b][1]
                          + (accessM[2][r][lineNum] + accessM[2][l][lineNum]) * accessCfilt[b][2] + (accessM[3][r][lineNum] + accessM[3][l][lineNum]) * accessCfilt[b][3];
 							
 							//test code here
-							if (lineNum == 250)
+/*
+				if (lineNum == 250)
            		{
-             			if (i == 500 + videoParameters.activeVideoStart)
+             		if (i == 500 + accessVideoPara[0].activeVideoStart)
                		{
 
-								access_c[offset + start] += (accessM[0][r][lineNum] + accessM[0][l][lineNum]) * accessCfilt[b][0] + (accessM[1][r][lineNum] + accessM[1][l][lineNum]) * accessCfilt[b][1]
-                          + (accessN[2][r][lineNum] + accessN[2][l][lineNum]) * accessCfilt[b][2] + (accessN[3][r][lineNum] + accessN[3][l][lineNum]) * accessCfilt[b][3];
+						access_c[offset + start] += (accessM[0][r][lineNum] + accessM[0][l][lineNum]) * accessCfilt[b][0] + (accessM[1][r][lineNum] + accessM[1][l][lineNum]) * accessCfilt[b][1]
+                          	+ (accessN[2][r][lineNum] + accessN[2][l][lineNum]) * accessCfilt[b][2] + (accessN[3][r][lineNum] + accessN[3][l][lineNum]) * accessCfilt[b][3];
 
 								//access_c[37] = 
 
-									if (start == 7)									
-									{
+						if (start == 7)									
+						{
 
-										access_c[offset + 8] = PU;
+							access_c[offset + 8] = PU;
 										
-										access_c[39] = lineNum;
-										access_c[40] = i;
+							access_c[39] = lineNum;
+							access_c[40] = i;
 
-										//accessPU[lineNum][i] = testValue;
+							//accessPU[lineNum][i] = testValue;
 
 
-										 //accessFilterComponents[lineNum][i].pu = 1224;
-									}
+							//accessFilterComponents[lineNum][i].pu = 1224;
+						}
 								
-								start++;
+						start++;
 
-								}
-							}
-							startTwo++;
-
-            }
+					}
+				}
+			startTwo++;
+*/
+            //}
 					//}
 
 
-          accessFilterComponents[lineNum][i].pu = PU;//testValue;//newPU;
-          accessFilterComponents[lineNum][i].qu = QU;
-          accessFilterComponents[lineNum][i].pv = PV;
-          accessFilterComponents[lineNum][i].qv = QV;
-          accessFilterComponents[lineNum][i].py = PY;
-        	accessFilterComponents[lineNum][i].qy = QY;
+				}
+
+
+          		accessFilterComponents[lineNum][i].pu = PU;//testValue;//newPU;
+          		accessFilterComponents[lineNum][i].qu = QU;
+          		accessFilterComponents[lineNum][i].pv = PV;
+          		accessFilterComponents[lineNum][i].qv = QV;
+          		accessFilterComponents[lineNum][i].py = PY;
+        		accessFilterComponents[lineNum][i].qy = QY;
 
 
 
 
-			 });
+			});
+
+		//});
+
+/*
+			myQueue.submit([&](cl::sycl::handler& cgh)
+         	{
+			auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
+
+			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
+
+			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::read_write>(cgh);
+
+			auto accessFilterComponents = bufFilterComponents.get_access<cl::sycl::access::mode::read_write>(cgh);
+
+			auto accessSine = bufSine.get_access<cl::sycl::access::mode::read>(cgh);
+            auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::read>(cgh);
+
+			auto accessInInfo = bufInInfo.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
+
+			auto accessLineInfo = bufLineInfo.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
 
+			auto access_c = buff_c.get_access<cl::sycl::access::mode::write>(cgh);
 
-       cgh.parallel_for<class decodeImageStageThree>(cl::sycl::range<2>{lines.size(), lineWidth}, [=](cl::sycl::item<2> tid)
-       {
+		const size_t lineWidth = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
+*/
+		cgh.parallel_for<class decodeImageStageThree>(cl::sycl::range<2>{lines.size(), lineWidth}, [=](cl::sycl::item<2> tid)
+		{
 
-					int lineNumber = tid.get_id(0);
-					int lineNum = lineNumber;
-					int linePixel = tid.get_id(1) + videoParameters.activeVideoStart;
-					int i = linePixel;
+			int lineNumber = tid.get_id(0);
+			int lineNum = lineNumber;
+			int linePixel = tid.get_id(1) + accessVideoPara[0].activeVideoStart;
+			int i = linePixel;
 
-					int realLineNum = lineNumber + firstLine;
+			int realLineNum = lineNumber + firstLine;
 
 
-					unsigned short *tempTwo = accessInputData.get_pointer();
-					unsigned short *temp = accessOutput.get_pointer();
+			unsigned short *tempTwo = accessInputData.get_pointer();
+			unsigned short *temp = accessOutput.get_pointer();
 
         	// Pointer to composite signal data
-        	const unsigned short *comp = tempTwo + (realLineNum * videoParameters.fieldWidth);
+        	const unsigned short *comp = tempTwo + (realLineNum * accessVideoPara[0].fieldWidth);
 
         	// Define scan line pointer to output buffer using 16 bit unsigned words
-        	unsigned short *ptr = temp + (((realLineNum * 2) + inputField.getOffset()) * videoParameters.fieldWidth * 3);
+        	unsigned short *ptr = temp + (((realLineNum * 2) + inputField.getOffset()) * accessVideoPara[0].fieldWidth * 3);
 
         	// Gain for the Y component, to put reference black at 0 and reference white at 65535
-        	const double scaledContrast = 65535.0 / (videoParameters.white16bIre - videoParameters.black16bIre);
+        	const double scaledContrast = 65535.0 / (accessVideoPara[0].white16bIre - accessVideoPara[0].black16bIre);
 
         	// Gain for the U/V components.
         	// The scale is the same as for Y above, doubled because the U/V filters
@@ -527,7 +571,7 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
         
 
 
-        	rY = cl::sycl::clamp((rY - videoParameters.black16bIre) * scaledContrast, 0.0, 65535.0);
+        	rY = cl::sycl::clamp((rY - accessVideoPara[0].black16bIre) * scaledContrast, 0.0, 65535.0);
 
 
 
@@ -543,16 +587,17 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
         	const int pp = i * 3;
 
-					ptr[pp + 0] = (unsigned short)R;
-					ptr[pp + 1] = (unsigned short)G;
-					ptr[pp + 2] = (unsigned short)B;
+			ptr[pp + 0] = (unsigned short)R;
+			ptr[pp + 1] = (unsigned short)G;
+			ptr[pp + 2] = (unsigned short)B;
 
+/*
 					//extracting data from a spercific pixel for testing purposes
 					if (lineNumber == 250)
 					{
-						if (linePixel == videoParameters.activeVideoStart + 500)
+						if (linePixel == accessVideoPara[0].activeVideoStart + 500)
 						{
-							int coll = videoParameters.activeVideoStart + 500;
+							int coll = accessVideoPara[0].activeVideoStart + 500;
 
 							access_c[0] = R;
 							access_c[1] = G;
@@ -599,7 +644,7 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 						}
 				}
-
+*/
 
 
 			});
