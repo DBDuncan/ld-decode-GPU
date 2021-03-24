@@ -137,7 +137,7 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 				}
 				else
 				{
-                   	temp = accessInputDataTwo.get_pointer();
+					temp = accessInputDataTwo.get_pointer();
 
 				}
 
@@ -185,56 +185,56 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 
 				double kp, kn;
 
-            	// Summing the differences of the *absolute* values of the 1D chroma samples
-            	// will give us a low value if the two lines are nearly in phase (strong Y)
-            	// or nearly 180 degrees out of phase (strong C) -- i.e. the two cases where
-            	// the 2D filter is probably usable. Also give a small bonus if
-            	// there's a large signal (we think).
-            	kp  = cl::sycl::fabs(cl::sycl::fabs(currentLine[h]) - cl::sycl::fabs(previousLine[h]));
-            	kp += cl::sycl::fabs(cl::sycl::fabs(currentLine[h - 1]) - cl::sycl::fabs(previousLine[h - 1]));
-            	kp -= (cl::sycl::fabs(currentLine[h]) + cl::sycl::fabs(previousLine[h - 1])) * .10;
-            	kn  = cl::sycl::fabs(cl::sycl::fabs(currentLine[h]) - cl::sycl::fabs(nextLine[h]));
-            	kn += cl::sycl::fabs(fabs(currentLine[h - 1]) - cl::sycl::fabs(nextLine[h - 1]));
-            	kn -= (cl::sycl::fabs(currentLine[h]) + cl::sycl::fabs(nextLine[h - 1])) * .10;
+				// Summing the differences of the *absolute* values of the 1D chroma samples
+				// will give us a low value if the two lines are nearly in phase (strong Y)
+				// or nearly 180 degrees out of phase (strong C) -- i.e. the two cases where
+				// the 2D filter is probably usable. Also give a small bonus if
+				// there's a large signal (we think).
+				kp  = cl::sycl::fabs(cl::sycl::fabs(currentLine[h]) - cl::sycl::fabs(previousLine[h]));
+				kp += cl::sycl::fabs(cl::sycl::fabs(currentLine[h - 1]) - cl::sycl::fabs(previousLine[h - 1]));
+				kp -= (cl::sycl::fabs(currentLine[h]) + cl::sycl::fabs(previousLine[h - 1])) * .10;
+				kn  = cl::sycl::fabs(cl::sycl::fabs(currentLine[h]) - cl::sycl::fabs(nextLine[h]));
+				kn += cl::sycl::fabs(fabs(currentLine[h - 1]) - cl::sycl::fabs(nextLine[h - 1]));
+				kn -= (cl::sycl::fabs(currentLine[h]) + cl::sycl::fabs(nextLine[h - 1])) * .10;
 
 
 				double irescale = (videoParameters.white16bIre - videoParameters.black16bIre) / 100;
-            	// Map the difference into a weighting 0-1.
-            	// 1 means in phase or unknown; 0 means out of phase (more than kRange difference).
-            	const double kRange = 45 * irescale;
-            	kp = cl::sycl::clamp(1 - (kp / kRange), 0.0, 1.0);
-            	kn = cl::sycl::clamp(1 - (kn / kRange), 0.0, 1.0);
+				// Map the difference into a weighting 0-1.
+				// 1 means in phase or unknown; 0 means out of phase (more than kRange difference).
+				const double kRange = 45 * irescale;
+				kp = cl::sycl::clamp(1 - (kp / kRange), 0.0, 1.0);
+				kn = cl::sycl::clamp(1 - (kn / kRange), 0.0, 1.0);
 
-            	double sc = 1.0;
+				double sc = 1.0;
 
-            	if ((kn > 0) || (kp > 0)) {
-                	// At least one of the next/previous lines has a good phase relationship.
+				if ((kn > 0) || (kp > 0)) {
+					// At least one of the next/previous lines has a good phase relationship.
 
-                	// If one of them is much better than the other, only use that one
-                	if (kn > (3 * kp)) kp = 0;
-                	else if (kp > (3 * kn)) kn = 0;
+					// If one of them is much better than the other, only use that one
+					if (kn > (3 * kp)) kp = 0;
+					else if (kp > (3 * kn)) kn = 0;
 
-                	sc = (2.0 / (kn + kp));
-                	if (sc < 1.0) sc = 1.0;
-            	} else {
-                	// Neither line has a good phase relationship.
+					sc = (2.0 / (kn + kp));
+					if (sc < 1.0) sc = 1.0;
+				} else {
+					// Neither line has a good phase relationship.
 
-                	// But are they similar to each other? If so, we can use both of them!
-                	if ((cl::sycl::fabs(cl::sycl::fabs(previousLine[h]) - cl::sycl::fabs(nextLine[h])) - cl::sycl::fabs((nextLine[h] + previousLine[h]) * .2)) <= 0) {
-                    	kn = kp = 1;
-                	}
+					// But are they similar to each other? If so, we can use both of them!
+					if ((cl::sycl::fabs(cl::sycl::fabs(previousLine[h]) - cl::sycl::fabs(nextLine[h])) - cl::sycl::fabs((nextLine[h] + previousLine[h]) * .2)) <= 0) {
+						kn = kp = 1;
+					}
 
-                	// Else kn = kp = 0, so we won't extract any chroma for this sample.
-                	// (Some NTSC decoders fall back to the 1D chroma in this situation.)
-            	}
+					// Else kn = kp = 0, so we won't extract any chroma for this sample.
+					// (Some NTSC decoders fall back to the 1D chroma in this situation.)
+				}
 
-            	// Compute the weighted sum of differences, giving the 2D chroma value
-            	double tc1;
-            	tc1  = ((currentLine[h] - previousLine[h]) * kp * sc);
-            	tc1 += ((currentLine[h] - nextLine[h]) * kn * sc);
-            	tc1 /= 4;
+				// Compute the weighted sum of differences, giving the 2D chroma value
+				double tc1;
+				tc1  = ((currentLine[h] - previousLine[h]) * kp * sc);
+				tc1 += ((currentLine[h] - nextLine[h]) * kn * sc);
+				tc1 /= 4;
 
-            	//clpbuffer[1].pixel[lineNumber][h] = tc1;
+				//clpbuffer[1].pixel[lineNumber][h] = tc1;
 				accessClpBuffer2D[lineNum][h] = tc1;
 
 			});
@@ -243,34 +243,32 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 
 
 			cgh.parallel_for<class splitIQ>(cl::sycl::range<2>{lines, width}, [=](cl::sycl::item<2> tid)
-            {
+			{
 			
 				
-                int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
-                int h = tid.get_id(1) + videoParameters.activeVideoStart;
+				int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
+				int h = tid.get_id(1) + videoParameters.activeVideoStart;
 
 
 				unsigned short *temp;
 
 
-                if ((tid.get_id(0) % 2) == 0)
-                {
-                    temp = accessInputDataOne.get_pointer();
-
-                }
-                else
-                {
-                    temp = accessInputDataTwo.get_pointer();
-
-                }
+				if ((tid.get_id(0) % 2) == 0)
+				{
+					temp = accessInputDataOne.get_pointer();
+				}
+				else
+				{
+					temp = accessInputDataTwo.get_pointer();
+				}
 
 
 
 
 
 				
-		        const unsigned short *line = temp + ((lineNum / 2) * videoParameters.fieldWidth);
-		        bool linePhase = getLinePhase(lineNum, inputFieldOne.field.fieldPhaseID, inputFieldTwo.field.fieldPhaseID);
+				const unsigned short *line = temp + ((lineNum / 2) * videoParameters.fieldWidth);
+				bool linePhase = getLinePhase(lineNum, inputFieldOne.field.fieldPhaseID, inputFieldTwo.field.fieldPhaseID);
 
 
 				//double si = 0;
@@ -282,15 +280,15 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 				double sq = 0;
 
 
-	            int phase = h % 4;
+				int phase = h % 4;
 
 				int phaseBefore = (h - 1) % 4;
 
-             	double cavg = accessClpBuffer2D[lineNum][h];
+				double cavg = accessClpBuffer2D[lineNum][h];
 				double cavgBefore = accessClpBuffer2D[lineNum][h - 1];
 
 
-             	if (linePhase)
+				if (linePhase)
 				{
 					cavg = -cavg;
 					cavgBefore = -cavgBefore;
@@ -299,26 +297,26 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 				//double si = 0;
 				//double sq = 0;
 
-             	switch (phase) {
-                	case 0: sq = cavg; break;
-                	case 1: si = -cavg; break;
-                	case 2: sq = -cavg; break;
-                	case 3: si = cavg; break;
-                	default: break;
-             	}
+				switch (phase) {
+					case 0: sq = cavg; break;
+					case 1: si = -cavg; break;
+					case 2: sq = -cavg; break;
+					case 3: si = cavg; break;
+					default: break;
+				}
 
                  switch (phaseBefore) {
                     case 0: sq = cavgBefore; break;
                     case 1: si = -cavgBefore; break;
                     case 2: sq = -cavgBefore; break;
                     case 3: si = cavgBefore; break;
-                	default: break;
+					default: break;
                 }
 
 
-             	accessYIQ[lineNum][h].y = line[h];
-             	accessYIQ[lineNum][h].i = si;
-             	accessYIQ[lineNum][h].q = sq;
+				accessYIQ[lineNum][h].y = line[h];
+				accessYIQ[lineNum][h].i = si;
+				accessYIQ[lineNum][h].q = sq;
 
 				//}
 
@@ -337,22 +335,22 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 				bool linePhase = getLinePhase(lineNum, inputFieldOne.field.fieldPhaseID, inputFieldTwo.field.fieldPhaseID);
 
 				double comp = 0;
-             	qint32 phase = h % 4;
+				qint32 phase = h % 4;
 
-             	YIQ y = accessYIQ[lineNum][h];
+				YIQ y = accessYIQ[lineNum][h];
 
-             	switch (phase) {
-                 	case 0: comp = -y.q; break;
-                 	case 1: comp = y.i; break;
-                 	case 2: comp = y.q; break;
-                 	case 3: comp = -y.i; break;
-                 	default: break;
-             	}
+				switch (phase) {
+					case 0: comp = -y.q; break;
+					case 1: comp = y.i; break;
+					case 2: comp = y.q; break;
+					case 3: comp = -y.i; break;
+					default: break;
+				}
 
-             	if (!linePhase) comp = -comp;
-             	y.y -= comp;
+				if (!linePhase) comp = -comp;
+				y.y -= comp;
 
-             	accessYIQ[lineNum][h] = y;
+				accessYIQ[lineNum][h] = y;
 
 
 
@@ -364,15 +362,15 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 			{
 
 
-             	int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
-            	int h = tid.get_id(1) + videoParameters.activeVideoStart;
+				int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
+				int h = tid.get_id(1) + videoParameters.activeVideoStart;
 
 
-		    	// High-pass filter for Y
+				// High-pass filter for Y
 				auto yFilter(f_nr);
 
-     			// nr_y is the coring level
-     			double nr_y = yNRLevel * irescale;
+				// nr_y is the coring level
+				double nr_y = yNRLevel * irescale;
 
 				//yFilter.feed(23344);	
 
@@ -381,8 +379,8 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 
 
 				if (cl::sycl::fabs(a) > nr_y) {
-                	a = (a > 0) ? nr_y : -nr_y;
-             	}
+					a = (a > 0) ? nr_y : -nr_y;
+				}
 
 
 				//accessYIQ[lineNum][h].y = a;//yFilter.a[1];//accessYIQ[lineNum][h].y;
@@ -400,8 +398,8 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 			{
 
 
-            	int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
-            	int h = tid.get_id(1) + videoParameters.activeVideoStart;
+				int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
+				int h = tid.get_id(1) + videoParameters.activeVideoStart;
 
 
 				unsigned short *temp;
@@ -412,20 +410,20 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 				unsigned short *pixelPointer = temp + (videoParameters.fieldWidth * 3 * lineNum) + (h * 3);
 
 
-			    double yBlackLevel = videoParameters.black16bIre;
-   				double yScale = 65535.0 / (videoParameters.white16bIre - videoParameters.black16bIre);
+				double yBlackLevel = videoParameters.black16bIre;
+				double yScale = 65535.0 / (videoParameters.white16bIre - videoParameters.black16bIre);
  
-  			   	// Compute I & Q scaling factor.
-    			// This is the same as for Y, i.e. when 7.5% setup is in use the chroma
-     			// scale is reduced proportionately.
-     			const double iqScale = yScale * chromaGain;
+				// Compute I & Q scaling factor.
+				// This is the same as for Y, i.e. when 7.5% setup is in use the chroma
+				// scale is reduced proportionately.
+				const double iqScale = yScale * chromaGain;
 
-     			if (whitePoint75) {
-         			// NTSC uses a 75% white point; so here we scale the result by
-         			// 25% (making 100 IRE 25% over the maximum allowed white point).
-         			// This doesn't affect the chroma scaling.
-         			yScale *= 125.0 / 100.0;
-     			}
+				if (whitePoint75) {
+					// NTSC uses a 75% white point; so here we scale the result by
+					// 25% (making 100 IRE 25% over the maximum allowed white point).
+					// This doesn't affect the chroma scaling.
+					yScale *= 125.0 / 100.0;
+				}
 
 
 
@@ -434,28 +432,28 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 				double i = accessYIQ[lineNum][h].i;
 				double q = accessYIQ[lineNum][h].q;
 
-         		// Scale the Y to 0-65535 where 0 = blackIreLevel and 65535 = whiteIreLevel
-         		y = (y - yBlackLevel) * yScale;
-         		y = qBound(0.0, y, 65535.0);
+				// Scale the Y to 0-65535 where 0 = blackIreLevel and 65535 = whiteIreLevel
+				y = (y - yBlackLevel) * yScale;
+				y = qBound(0.0, y, 65535.0);
 
-         		// Scale the I & Q components
-         		i *= iqScale;
-         		q *= iqScale;
+				// Scale the I & Q components
+				i *= iqScale;
+				q *= iqScale;
 
-         		// Y'IQ to R'G'B' colour-space conversion.
-         		// Coefficients from Poynton, "Digital Video and HDTV" first edition, p367 eq 30.3.
-         		double r = y + (0.955986 * i) + (0.620825 * q);
-         		double g = y - (0.272013 * i) - (0.647204 * q);
-         		double b = y - (1.106740 * i) + (1.704230 * q);
+				// Y'IQ to R'G'B' colour-space conversion.
+				// Coefficients from Poynton, "Digital Video and HDTV" first edition, p367 eq 30.3.
+				double r = y + (0.955986 * i) + (0.620825 * q);
+				double g = y - (0.272013 * i) - (0.647204 * q);
+				double b = y - (1.106740 * i) + (1.704230 * q);
 
-         		r = cl::sycl::clamp(r, 0.0, 65535.0);
-         		g = cl::sycl::clamp(g, 0.0, 65535.0);
-         		b = cl::sycl::clamp(b, 0.0, 65535.0);
+				r = cl::sycl::clamp(r, 0.0, 65535.0);
+				g = cl::sycl::clamp(g, 0.0, 65535.0);
+				b = cl::sycl::clamp(b, 0.0, 65535.0);
 
-         		// Place the 16-bit RGB values in the output array
-         		pixelPointer[0] = static_cast<unsigned short>(r);
-         		pixelPointer[1] = static_cast<unsigned short>(g);
-         		pixelPointer[2] = static_cast<unsigned short>(b);
+				// Place the 16-bit RGB values in the output array
+				pixelPointer[0] = static_cast<unsigned short>(r);
+				pixelPointer[1] = static_cast<unsigned short>(g);
+				pixelPointer[2] = static_cast<unsigned short>(b);
 
 
 
