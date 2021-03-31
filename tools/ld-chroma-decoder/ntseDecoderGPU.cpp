@@ -305,13 +305,13 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 					default: break;
 				}
 
-                 switch (phaseBefore) {
-                    case 0: sq = cavgBefore; break;
-                    case 1: si = -cavgBefore; break;
-                    case 2: sq = -cavgBefore; break;
-                    case 3: si = cavgBefore; break;
+				switch (phaseBefore) {
+					case 0: sq = cavgBefore; break;
+					case 1: si = -cavgBefore; break;
+					case 2: sq = -cavgBefore; break;
+					case 3: si = cavgBefore; break;
 					default: break;
-                }
+				}
 
 
 				accessYIQ[lineNum][h].y = line[h];
@@ -328,7 +328,7 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 			{
 
 				int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
-                int h = tid.get_id(1) + videoParameters.activeVideoStart;
+				int h = tid.get_id(1) + videoParameters.activeVideoStart;
 
 
 
@@ -462,7 +462,7 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 
 
 
-
+/*
 
 			cgh.parallel_for<class test>(cl::sycl::range<1>{1}, [=](cl::sycl::item<1> tid)
 			{
@@ -484,7 +484,7 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 
 			});
 
-
+*/
 
 
 

@@ -281,11 +281,11 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
         //decodeField(inputFields[i], chromaData[j], chromaGain, outputFrames[k]);
         //decodeField(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k]);
 
-
+		//std::cout << "-------------------------GPU------------------------" << std::endl;
 				//std::cout << typeid(videoParameters).name() << std::endl;
-				decodeFieldGPU(inputFields[i], chromaData[j], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
-				decodeFieldGPU(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
-
+				decodeFieldGPU(inputFields[i], inputFields[i + 1], chromaData[j], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
+				//decodeFieldGPU(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
+		//std::cout << "-------------------------CPU------------------------" << std::endl;
     }
 
     if (configuration.showFFTs && configuration.chromaFilter != palColourFilter) {
@@ -824,13 +824,14 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
         ptr[pp + 2] = static_cast<quint16>(B);
 
 			
-
-				if (numtttt == 250)
+/*
+				if (numtttt == 1)
 				{
 
-					if (i == videoParameters.activeVideoStart + 500)
+					if (i == videoParameters.activeVideoStart + 0)
 						{
-	
+						
+							std::cout << "i is: " << i << std::endl;	
 							std::cout << "Real Red Pixel Value: " << R << std::endl;
 							std::cout << "Real Green Pixel Value: " << G << std::endl;
 							std::cout << "Real Blue Pixel Value: " << B << std::endl;
@@ -861,13 +862,18 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
               std::cout << "qy: " << qy[i] << std::endl;
 
 							std::cout << "Cfilt value: " << cfilt[6][1] << std::endl;;
-							
+						
+							std::cout << "rU: " << rU << std::endl;
+							std::cout << "rV: " << rV << std::endl;
+							std::cout << "rY: " << rY << std::endl;
+							std::cout << "comp: " << line.number << std::endl;//was comp[0]
+									
 							numtttt = 999;
 						}
 
 				}
 
-
+*/
 
     }
 

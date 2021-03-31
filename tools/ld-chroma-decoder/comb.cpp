@@ -128,8 +128,9 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
     // rotate the pointers below.
     QScopedPointer<FrameBuffer> nextFrameBuffer, currentFrameBuffer, previousFrameBuffer;
     //nextFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
-    currentFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
+    currentFrameBuffer.reset(new FrameBuffer(videoParameters, configuration)); //for GPU only need this
     //previousFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
+/*
 
     // Decode each pair of fields into a frame.
     // To support 3D operation, where we need to see three input frames at a time,
@@ -148,22 +149,22 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
 
 		// Rotate the buffers
         {
-            //QScopedPointer<FrameBuffer> recycle(previousFrameBuffer.take());
-            //previousFrameBuffer.reset(currentFrameBuffer.take());
-            //currentFrameBuffer.reset(nextFrameBuffer.take());
-            //nextFrameBuffer.reset(recycle.take());
+            QScopedPointer<FrameBuffer> recycle(previousFrameBuffer.take());
+            previousFrameBuffer.reset(currentFrameBuffer.take());
+            currentFrameBuffer.reset(nextFrameBuffer.take());
+            nextFrameBuffer.reset(recycle.take());
         }
 
         // If there's another input field, bring it into nextFrameBuffer
         if (fieldIndex + 3 < inputFields.size()) {
             // Load fields into the buffer
-            //nextFrameBuffer->loadFields(inputFields[fieldIndex + 2], inputFields[fieldIndex + 3]);
+            nextFrameBuffer->loadFields(inputFields[fieldIndex + 2], inputFields[fieldIndex + 3]);
 
             // Extract chroma using 1D filter
-            //nextFrameBuffer->split1D();
+            nextFrameBuffer->split1D();
 
             // Extract chroma using 2D filter
-            //nextFrameBuffer->split2D();
+            nextFrameBuffer->split2D();
 
 			//std::cout << "colour value: " << nextFrameBuffer->clpbuffer[0].pixel[200][200] << std::endl;
 
@@ -182,10 +183,10 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
         }
 
         // Demodulate chroma giving I/Q
-        //currentFrameBuffer->splitIQ();
+        currentFrameBuffer->splitIQ();
 
         // Extract Y from baseband and I/Q
-        //currentFrameBuffer->adjustY();
+        currentFrameBuffer->adjustY();
 
         // Post-filter I/Q
         if (configuration.colorlpf) 
@@ -204,7 +205,7 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
         //currentFrameBuffer->doCNR();
 
         // Convert the YIQ result to RGB
-        //outputFrames[frameIndex] = currentFrameBuffer->yiqToRgbFrame();
+        outputFrames[frameIndex] = currentFrameBuffer->yiqToRgbFrame();
 
         // Overlay the map if required
         if (configuration.dimensions == 3 && configuration.showMap) {
@@ -225,10 +226,35 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
 
 
 		// was +2 and +3
-		decodeFrameGPU(inputFields[fieldIndex], inputFields[fieldIndex + 1], outputFrames[frameIndex], videoParameters, currentFrameBuffer->rawbuffer, configuration.yNRLevel, currentFrameBuffer->irescale, configuration.chromaGain, configuration.whitePoint75);
+		//decodeFrameGPU(inputFields[fieldIndex], inputFields[fieldIndex + 1], outputFrames[frameIndex], videoParameters, currentFrameBuffer->rawbuffer, configuration.yNRLevel, currentFrameBuffer->irescale, configuration.chromaGain, configuration.whitePoint75);
 
 
     }
+*/
+
+
+
+	const qint32 preStartIndex = (configuration.dimensions == 3) ? startIndex - 4 : startIndex - 2;
+	for (qint32 fieldIndex = preStartIndex; fieldIndex < endIndex; fieldIndex += 2) {
+		const qint32 frameIndex = (fieldIndex - startIndex) / 2;
+
+
+        if (fieldIndex < startIndex) {
+            //std::cout << "look behind frame" << std::endl;
+            // This is a look-behind frame; no further decoding needed.
+            continue;
+        }
+
+		double ireScale = (videoParameters.white16bIre - videoParameters.black16bIre) / 100;
+		decodeFrameGPU(inputFields[fieldIndex], inputFields[fieldIndex + 1], outputFrames[frameIndex], videoParameters, currentFrameBuffer->rawbuffer, configuration.yNRLevel, ireScale, configuration.chromaGain, configuration.whitePoint75);
+
+
+	}
+
+
+
+
+
 }
 
 // Private methods ----------------------------------------------------------------------------------------------------

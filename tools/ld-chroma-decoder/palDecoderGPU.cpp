@@ -38,7 +38,7 @@ double opti(double num1, double num2)
 void decodeFieldGPU(const SourceField &inputField, const double *chromaData, double chromaGain, RGBFrame &outputFrame)
 {
 
-
+	int a;
 
 }
 
@@ -80,7 +80,7 @@ struct FilterComponents {
 
 
 
-void decodeFieldGPU(const SourceField &inputField, const double *chromaData, double chromaGain, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, double sine[], double cosine[], double cfilt[][4], double yfilt[][2])
+void decodeFieldGPU(const SourceField &inputField, const SourceField &inputFieldTwo, const double *chromaData, double chromaGain, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, double sine[], double cosine[], double cfilt[][4], double yfilt[][2])
 {
 	//work in progress
 
@@ -90,14 +90,19 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
   	const qint32 lastLine = inputField.getLastActiveLine(videoParameters);
 	//22 310
 
+	const qint32 firstLineFieldTwo = inputFieldTwo.getFirstActiveLine(videoParameters);
 
 	const int numOfLines = lastLine - firstLine;
 
 	int arraySize = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
 
-	std::vector<int> lines(lastLine - firstLine);
+	//std::vector<int> lines(lastLine - firstLine);
 
-	std::iota(lines.begin(), lines.end(), firstLine);
+	int numLinesField = lastLine - firstLine;
+
+	const size_t numLinesFrame = numLinesField * 2;
+
+	//std::iota(lines.begin(), lines.end(), firstLine);
 
 	int colourBurstLength = videoParameters.colourBurstEnd - videoParameters.colourBurstStart;
 
@@ -105,8 +110,11 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 	std::vector<double> c(100);
 
 
+	//std::cout << numLinesField << " : " << numLinesFrame << std::endl;
 
 	//std::cout << "width: " << lastLine - firstLine << std::endl;
+
+	//std::cout << "colour burst length: " << videoParameters.colourBurstEnd - videoParameters.colourBurstStart << std::endl;
 
 
 	//bracketed to make sure buffers deconstruct when calcuation is done and transfer data back.
@@ -126,27 +134,30 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 		const qint32 frameHeightTwo = (videoParameters.fieldHeight * 2) - 1;
 		cl::sycl::buffer<unsigned short> bufInputData(inputField.data.data(), cl::sycl::range<1>((inputField.data.size())));//was arraySize * 288
 
+		cl::sycl::buffer<unsigned short> bufInputDataTwo(inputFieldTwo.data.data(), cl::sycl::range<1>(inputFieldTwo.data.size()));
+
+
 		//buffer containing offset of first line (prob 22) also prob needs to be removed
 		cl::sycl::buffer<int> bufFirstLineNum(&firstLine, cl::sycl::range<1>(1));
 
 		//buffer for lineinfo structs
 		//cl::sycl::buffer<LineInfo> bufLineInfo(lineInfos.data(), cl::sycl::range<1>(lastLine - firstLine));
-		cl::sycl::buffer<LineInfo> bufLineInfo(cl::sycl::range<1>(lastLine - firstLine));
+		cl::sycl::buffer<LineInfo> bufLineInfo{cl::sycl::range<1>(numLinesFrame)};//was lastLine - firstLine
 
 
 		//test buffer
 		cl::sycl::buffer<LineInfo> bufTest{cl::sycl::range<1>(200)};
 
 		//buffer of structs containing pointers.
-		cl::sycl::buffer<InInfo> bufInInfo{cl::sycl::range<1>(288)};
+		cl::sycl::buffer<InInfo> bufInInfo{cl::sycl::range<1>(numLinesFrame)};
 
 		//first two nums are set, last is of how many lines.
-		cl::sycl::buffer<double, 3> bufM{cl::sycl::range<3>(4, 1135, 288)};
-		cl::sycl::buffer<double, 3> bufN{cl::sycl::range<3>(4, 1135, 288)};
+		cl::sycl::buffer<double, 3> bufM{cl::sycl::range<3>(4, 1135, numLinesFrame)};
+		cl::sycl::buffer<double, 3> bufN{cl::sycl::range<3>(4, 1135, numLinesFrame)};
 
 
 		//accessor of filter component structs to help calculate colour of each pixel.
-		cl::sycl::buffer<FilterComponents, 2> bufFilterComponents{cl::sycl::range<2>(288, 1135)};// was 1135 288
+		cl::sycl::buffer<FilterComponents, 2> bufFilterComponents{cl::sycl::range<2>(numLinesFrame, 1135)};// was 1135 288
 		
 		//buffer of c and y filt. maybe can be calculated on GPU?
 		cl::sycl::buffer<double, 2> bufCfilt(*cfilt, cl::sycl::range<2>(7 + 1, 4));
@@ -159,10 +170,13 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 
 		//test PU buffer. needs to be removed.
-		cl::sycl::buffer<double, 2> bufPU{cl::sycl::range<2>(288, 1135)};//was 1135 288
+		//cl::sycl::buffer<double, 2> bufPU{cl::sycl::range<2>(288, 1135)};//was 1135 288
 
 
 		cl::sycl::buffer<LdDecodeMetaData::VideoParameters> bufVideoPara(&videoParameters, cl::sycl::range<1>(1));
+
+
+		cl::sycl::buffer<unsigned short> bufBlackLine{cl::sycl::range<1>(1135)};
 
 //keep for easy output of GPU device on system
 //std::cout << "Running on "
@@ -186,6 +200,7 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 			//accessor of input data
 			auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessInputDataTwo = bufInputDataTwo.get_access<cl::sycl::access::mode::read>(cgh);
 
 			//accessor of the number of the first line offset. prob no longer need.
 			auto accessFirstLineNum = bufFirstLineNum.get_access<cl::sycl::access::mode::read>(cgh);
@@ -216,34 +231,59 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 			auto accessYfilt = bufYfilt.get_access<cl::sycl::access::mode::read>(cgh); 
 
 			//accessor of output
-			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::read_write>(cgh);//changed from read_write
+			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::write>(cgh);//changed from read_write
 
 			//test accessor of PU
-			auto accessPU = bufPU.get_access<cl::sycl::access::mode::read_write>(cgh);
+			//auto accessPU = bufPU.get_access<cl::sycl::access::mode::read_write>(cgh);
 
 
 			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
 
+			auto accessBlackLine = bufBlackLine.get_access<cl::sycl::access::mode::read>(cgh);
 
-			cgh.parallel_for<class vector_chroma>(cl::sycl::range<1>{lines.size()}, [=](cl::sycl::item<1> tid)
+
+			cgh.parallel_for<class detectBursts>(cl::sycl::range<1>{numLinesFrame}, [=](cl::sycl::item<1> tid)
 			{
 
 				int lineNum = tid.get_id(0);
 
 
 
-				accessLineInfo[lineNum].number = lineNum + accessFirstLineNum[0];//lineNum + accessFirstLineNum[0];
-
-
-				static constexpr quint16 blackLine[1135] = {0};
+				
 
 
 
-				unsigned short *pointerInputData = accessInputData.get_pointer();
+
+
+				accessLineInfo[lineNum].number = (lineNum / 2) + accessFirstLineNum[0];//lineNum + accessFirstLineNum[0];
+
+
+				//static constexpr quint16 blackLine[1135] = {0};
+
+
+				unsigned short *blackLine = accessBlackLine.get_pointer();
+
+
+				//unsigned short *pointerInputData = accessInputData.get_pointer();
+
+				unsigned short *temp;
+
+                if ((tid.get_id(0) % 2) == 0)//was == 0
+                {
+                    temp = accessInputData.get_pointer();
+
+                }
+                else
+                {
+                    temp = accessInputDataTwo.get_pointer();
+                }
 
 
 
-				int fullLineNum = lineNum + accessFirstLineNum[0];
+				unsigned short *pointerInputData = temp;
+
+
+				int fullLineNum = (lineNum / 2) + accessFirstLineNum[0];
 
 
 				// Get pointers to the surrounding lines of input data.
@@ -334,18 +374,18 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
      			accessInInfo[lineNum].in5 = in5Two;
      			accessInInfo[lineNum].in6 = in6Two;
 
-
+/*
 				//test code
-				if (tid.get_id(0) == 0)
+				if (tid.get_id(0) == 1)
 				{
 
-					//access_c[0] = bp;//in0[0];
-					access_c[1] = (lineNum + accessFirstLineNum[0])      * accessVideoPara[0].fieldWidth;
+					access_c[0] = accessLineInfo[lineNum].bp;//in0[0];
+					//access_c[1] = (lineNum + accessFirstLineNum[0])      * accessVideoPara[0].fieldWidth;
 					//access_c[0] = 5.0;
-					access_c[2] = lineNum + accessFirstLineNum[0];
-					//access_c[3] = in0[0];
+					//access_c[2] = lineNum + accessFirstLineNum[0];
+					access_c[3] = in0[182];
 				}
-
+*/
 			});
 
 			//this cuda function works here!!!!!
@@ -353,15 +393,33 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 		const size_t lineWidthCustom = videoParameters.activeVideoEnd - videoParameters.activeVideoStart + 1 + 7;
 
-		cgh.parallel_for<class decodeImage>(cl::sycl::range<2>{lines.size(), lineWidthCustom}, [=](cl::sycl::item<2> tid)
+		//std::cout << "numLinesFrame: " << numLinesFrame << std::endl;
+			
+		
+		cgh.parallel_for<class createMandN>(cl::sycl::range<2>{numLinesFrame, lineWidthCustom}, [=](cl::sycl::item<2> tid)
 		{
 
 			int line = tid.get_id(0);
 			//plus active video start for offset
 			int col = tid.get_id(1) + accessVideoPara[0].activeVideoStart - 7;
 			
+			//line = 576;
+
+			//if (line > 575)
+				//line = 3;
+			//accessM[0][col][line] = 55;
+			//unsigned short num = accessInInfo[line].in0[col];
+			//accessM[0][col][line] =  accessInInfo[line].in0[col];
+
+	
+			//accessM[0][col][line] = line + 1;
+			//unsigned short num = accessSine[col];
+			//unsigned short numTwo = accessInInfo[line].in0[col];		
+			//unsigned short numThree = num * numTwo;
+			//accessM[0][col][line] = numTwo;
 
 
+			//accessM[0][col][line] = num * numTwo;
       		accessM[0][col][line] =  accessInInfo[line].in0[col] * accessSine[col];
       		accessM[2][col][line] =  accessInInfo[line].in1[col] * accessSine[col] - accessInInfo[line].in2[col] * accessSine[col];
       		accessM[1][col][line] = -accessInInfo[line].in3[col] * accessSine[col] - accessInInfo[line].in4[col] * accessSine[col];
@@ -388,7 +446,7 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 		//std::cout << "Number of Lines:::>>>>" << lines.size() << std::endl;
 
 
-		cgh.parallel_for<class decodeImageStageTwo>(cl::sycl::range<2>{lines.size(), 1135}, [=](cl::sycl::item<2> tid)
+		cgh.parallel_for<class chromaFilter>(cl::sycl::range<2>{numLinesFrame, 1135}, [=](cl::sycl::item<2> tid)
 		{	
 
 			
@@ -489,15 +547,15 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 					}
 				}
 			startTwo++;
-*/
+
             //}
 					//}
 
-
+*/
 				}
 
 
-          		accessFilterComponents[lineNum][i].pu = PU;//testValue;//newPU;
+          		accessFilterComponents[lineNum][i].pu = PU;//PU;//testValue;//newPU;
           		accessFilterComponents[lineNum][i].qu = QU;
           		accessFilterComponents[lineNum][i].pv = PV;
           		accessFilterComponents[lineNum][i].qv = QV;
@@ -534,25 +592,53 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 		const size_t lineWidth = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
 */
-		cgh.parallel_for<class decodeImageStageThree>(cl::sycl::range<2>{lines.size(), lineWidth}, [=](cl::sycl::item<2> tid)
-		{
 
-			int lineNumber = tid.get_id(0);
+		cgh.parallel_for<class decodeRGB>(cl::sycl::range<2>{numLinesFrame, lineWidth}, [=](cl::sycl::item<2> tid)
+		{
+			
+			int lineNumber = (int)tid.get_id(0) / 2;
 			int lineNum = lineNumber;
 			int linePixel = tid.get_id(1) + accessVideoPara[0].activeVideoStart;
 			int i = linePixel;
 
 			int realLineNum = lineNumber + firstLine;
 
+			
+			int lineNumFull = tid.get_id(0);
 
-			unsigned short *tempTwo = accessInputData.get_pointer();
+			//unsigned short *tempTwo = accessInputData.get_pointer();
+
+			unsigned short *inputTemp;
+			//unsigned short *temp = accessOutput.get_pointer();	
+
+			int addedNum = 0;
+
+             if ((tid.get_id(0) % 2) == 0)
+             {
+             	inputTemp = accessInputData.get_pointer();
+
+             }
+             else
+             {
+             	inputTemp = accessInputDataTwo.get_pointer();
+				//realLineNum = lineNumber + firstLineFieldTwo;
+            	//temp = temp + 1; 
+				//realLineNum += 1;
+				addedNum = 1;
+				realLineNum = lineNumber + firstLineFieldTwo;
+			}
+
+			unsigned short *tempTwo = inputTemp;
+
+
+
 			unsigned short *temp = accessOutput.get_pointer();
 
         	// Pointer to composite signal data
         	const unsigned short *comp = tempTwo + (realLineNum * accessVideoPara[0].fieldWidth);
 
         	// Define scan line pointer to output buffer using 16 bit unsigned words
-        	unsigned short *ptr = temp + (((realLineNum * 2) + inputField.getOffset()) * accessVideoPara[0].fieldWidth * 3);
+        	unsigned short *ptr = temp + (((realLineNum * 2) + inputField.getOffset()) * accessVideoPara[0].fieldWidth * 3) + (addedNum * accessVideoPara[0].fieldWidth * 3);
 
         	// Gain for the Y component, to put reference black at 0 and reference white at 65535
         	const double scaledContrast = 65535.0 / (accessVideoPara[0].white16bIre - accessVideoPara[0].black16bIre);
@@ -567,16 +653,16 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
         	double rY;
 
         	//if statement will need to be around the line bellow if prefiltered chroma is being used, but prefiltered chroma is not supported at all at the moment
-        	rY = comp[i] - ((accessFilterComponents[lineNum][i].py * accessSine[i] + accessFilterComponents[lineNum][i].qy * accessCosine[i]) * 2.0);
+        	rY = comp[i] - ((accessFilterComponents[lineNumFull][i].py * accessSine[i] + accessFilterComponents[lineNumFull][i].qy * accessCosine[i]) * 2.0);
         
 
 
         	rY = cl::sycl::clamp((rY - accessVideoPara[0].black16bIre) * scaledContrast, 0.0, 65535.0);
 
+			
 
-
-        	const double rU = -(accessFilterComponents[lineNum][i].pu * accessLineInfo[lineNum].bp + accessFilterComponents[lineNum][i].qu * accessLineInfo[lineNum].bq) * scaledSaturation;
-        	const double rV = accessLineInfo[lineNum].Vsw * -(accessFilterComponents[lineNum][i].qv * accessLineInfo[lineNum].bp - accessFilterComponents[lineNum][i].pv * accessLineInfo[lineNum].bq) * scaledSaturation;
+        	const double rU = -(accessFilterComponents[lineNumFull][i].pu * accessLineInfo[lineNumFull].bp + accessFilterComponents[lineNumFull][i].qu * accessLineInfo[lineNumFull].bq) * scaledSaturation;
+        	const double rV = accessLineInfo[lineNumFull].Vsw * -(accessFilterComponents[lineNumFull][i].qv * accessLineInfo[lineNumFull].bp - accessFilterComponents[lineNumFull][i].pv * accessLineInfo[lineNumFull].bq) * scaledSaturation;
 
 
         	const double R = cl::sycl::clamp(rY + (1.139883 * rV), 0.0, 65535.0);
@@ -593,11 +679,11 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 /*
 					//extracting data from a spercific pixel for testing purposes
-					if (lineNumber == 250)
+					if (3 == tid.get_id(0))//was lineNumber == 0
 					{
-						if (linePixel == accessVideoPara[0].activeVideoStart + 500)
+						if (linePixel == accessVideoPara[0].activeVideoStart + 0)
 						{
-							int coll = accessVideoPara[0].activeVideoStart + 500;
+							int coll = accessVideoPara[0].activeVideoStart + 0;
 
 							access_c[0] = R;
 							access_c[1] = G;
@@ -639,8 +725,12 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 							access_c[42] = i;
 							access_c[43] = accessFilterComponents[250][282].pu;
 
-							access_c[44] = accessPU[lineNum][i];
-
+							//access_c[44] = accessPU[lineNum][i];
+						
+							access_c[45] = rU;
+							access_c[46] = rV;
+							access_c[47] = rY;
+							access_c[48] = realLineNum;//comp[0];
 
 						}
 				}
@@ -651,7 +741,7 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 //little test kernel. will be removed later.
 /*
-     cgh.parallel_for<class test>(cl::sycl::range<1>{lines.size()}, [=](cl::sycl::item<1> tid)
+     cgh.parallel_for<class test>(cl::sycl::range<1>{1}, [=](cl::sycl::item<1> tid)
      {
 
 		//access_c[0] = accessM[0][1134][0];
@@ -664,11 +754,17 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 		//access_c[0] = accessOutput[2046 + (((22 * 2) + inputField.getOffset()) * videoParameters.fieldWidth * 3)];
 
+		//item, col, line
+		//access_c[13] = accessM[0][500][1];
+		//access_c[14] = accessM[1][500][1];
+		//access_c[15] = accessM[2][500][1];
+		//access_c[16] = accessM[3][500][1];
+
 
 });
+
+
 */
-
-
 
 
 
@@ -690,16 +786,17 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 
 
 
-	for (const auto x: lineInfos)
-		std::cout << "Test Output:::" << "output: " << lineInfos[0].bq << std::endl;
+	//for (const auto x: lineInfos)
+		//std::cout << "Test Output:::" << "output: " << lineInfos[0].bq << std::endl;
 
 
-	std::cout << "big TEST::::::::::" << c[0] << std::endl;
+	std::cout << "R: " << c[0] << std::endl;
 	std::cout << "::::::::::::::::::" << c[1] << std::endl;
 	std::cout << "::::::::::::::::::" << c[2] << std::endl;
-	std::cout << "bp: " << c[3] << std::endl;
+	//std::cout << "In[0]: " << c[3] << std::endl;
 	std::cout << "bq: " << c[4] << std::endl;
 	std::cout << "Vsw: " << c[5] << std::endl;
+
 
 	std::cout << "In0: " << c[6] << std::endl;
 	std::cout << "In1: " << c[7] << std::endl;
@@ -709,7 +806,9 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 	std::cout << "In5: " << c[11] << std::endl;
 	std::cout << "In6: " << c[12] << std::endl;
 
+
 	std::cout << "M1: " << c[13] << std::endl;
+
   std::cout << "M2: " << c[14] << std::endl;
   std::cout << "M3: " << c[15] << std::endl;
   std::cout << "M4: " << c[16] << std::endl;
@@ -727,12 +826,12 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
   std::cout << "qy: " << c[26] << std::endl;
 
 
+*/
 
 
-
-	std::cout << "output: " << outputFrame.data()[2000] << std::endl;
-	std::cout << "PP: " << c[27] << std::endl;
-
+	//std::cout << "output: " << outputFrame.data()[2000] << std::endl;
+	//std::cout << "PP: " << c[27] << std::endl;
+/*
 	std::cout << "PU 1: " << c[28] << std::endl;
   std::cout << "PU 2: " << c[29] << std::endl;
   std::cout << "PU 3: " << c[30] << std::endl;
@@ -758,8 +857,12 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 	std::cout << "test: " << c[43] << std::endl;
 	std::cout << "accessPU Value: " << c[44] << std::endl;
 */
-
-
+/*
+	std::cout << "rU: " << c[45] << std::endl;
+	std::cout << "rV: " << c[46] << std::endl;
+	std::cout << "rY: " << c[47] << std::endl;
+	std::cout << "comp: " << c[48] << std::endl;
+*/
 }
 
 
