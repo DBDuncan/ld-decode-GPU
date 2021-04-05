@@ -232,7 +232,7 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
     }
 */
 
-
+	DecodeNTSC gpuDecoder;
 
 	const qint32 preStartIndex = (configuration.dimensions == 3) ? startIndex - 4 : startIndex - 2;
 	for (qint32 fieldIndex = preStartIndex; fieldIndex < endIndex; fieldIndex += 2) {
@@ -246,7 +246,7 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
         }
 
 		double ireScale = (videoParameters.white16bIre - videoParameters.black16bIre) / 100;
-		decodeFrameGPU(inputFields[fieldIndex], inputFields[fieldIndex + 1], outputFrames[frameIndex], videoParameters, currentFrameBuffer->rawbuffer, configuration.yNRLevel, ireScale, configuration.chromaGain, configuration.whitePoint75);
+		gpuDecoder.decodeFrameGPU(inputFields[fieldIndex], inputFields[fieldIndex + 1], outputFrames[frameIndex], videoParameters, currentFrameBuffer->rawbuffer, configuration.yNRLevel, ireScale, configuration.chromaGain, configuration.whitePoint75);
 
 
 	}

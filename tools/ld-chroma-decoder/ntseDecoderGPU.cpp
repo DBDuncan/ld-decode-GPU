@@ -42,7 +42,16 @@ inline bool getLinePhase(qint32 lineNumber, int firstFieldPhaseID, int secondFie
 }
 
 
-void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFieldTwo, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, QVector<quint16> rawbuffer, double yNRLevel, double irescale, double chromaGain, bool whitePoint75)
+DecodeNTSC::DecodeNTSC()
+{}
+
+DecodeNTSC::~DecodeNTSC()
+{}
+
+
+
+
+void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFieldTwo, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, QVector<quint16> rawbuffer, double yNRLevel, double irescale, double chromaGain, bool whitePoint75)
 {
 
 
@@ -61,10 +70,10 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 
 	{
 
-		cl::sycl::queue myQueue;
+		//cl::sycl::queue myQueue;
 
 
-		cl::sycl::buffer<double> bufTestOutput(testData.data(), testData.size());
+		//cl::sycl::buffer<double> bufTestOutput(testData.data(), testData.size());
 
 
 		//cl::sycl::buffer<unsigned short> bufInputData(rawbuffer.data(), rawbuffer.size());
@@ -75,7 +84,7 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 
 
 		//cl::sycl::buffer<double, 2> bufClpBuffer1D{cl::sycl::range<2>(525, 910)};//was 525
-		cl::sycl::buffer<double, 2> bufClpBuffer2D{cl::sycl::range<2>(525, 910)};
+		//cl::sycl::buffer<double, 2> bufClpBuffer2D{cl::sycl::range<2>(525, 910)};
 
 		//cl::sycl::buffer<YIQ, 2> bufYIQ{cl::sycl::range<2>(525, 910)};
 
@@ -87,7 +96,7 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 		{
 
 
-			auto accessTestOutput = bufTestOutput.get_access<cl::sycl::access::mode::write>(cgh);
+			//auto accessTestOutput = bufTestOutput.get_access<cl::sycl::access::mode::write>(cgh);
 	
 
 			//auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
@@ -331,6 +340,34 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 					break;
 					default: break;
 				}
+/*
+
+				double cavgBeforeArray[4];
+
+				cavgBeforeArray[0] = cavgBefore;
+				cavgBeforeArray[1] = -cavgBefore;
+				cavgBeforeArray[2] = -cavgBefore;
+				cavgBeforeArray[3] = cavgBefore;
+
+
+				if ((phase % 2) == 0)
+				{
+
+					sq = cavgBeforeArray[phase];	
+					si = cavg
+
+
+				}
+				else
+				{
+
+					si = cavgBeforeArray[phase];
+
+
+				}
+
+
+*/
 
 
 				//accessYIQ[lineNum][h].y = line[h];
@@ -351,6 +388,17 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 					default: break;
 				}
 
+
+/*
+				double accessComp[4];
+
+				accessComp[0] = -sq;
+				accessComp[1] = si;
+				accessComp[2] = sq;
+				accessComp[3] = -si;
+
+				comp = accessComp[phase];
+*/
 
 				if (!linePhase)
 				{
@@ -599,10 +647,11 @@ void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFi
 */
 }
 
+/*
 void decodeFrameGPU(RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters)
 {
 
 
 }
 
-
+*/

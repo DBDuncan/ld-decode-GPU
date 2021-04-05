@@ -9,6 +9,8 @@
 #include "sourcefield.h"
 #include "lddecodemetadata.h"
 
+#include <CL/sycl.hpp>
+
      struct Configuration {
          double chromaGain = 1.0;
          bool colorlpf = false;
@@ -25,6 +27,27 @@
          qint32 getLookAhead() const;
      };
 
-void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFieldTwo, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, QVector<quint16> rawbuffer, double yNRLevel, double irescale, double chromaGain, bool whitePoint75);
 
-void decodeFrameGPU(RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters);
+class DecodeNTSC {
+
+public:
+
+	DecodeNTSC();
+
+	~DecodeNTSC();
+
+
+	void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFieldTwo, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, QVector<quint16> rawbuffer, double yNRLevel, double irescale, double chromaGain, bool whitePoint75);
+
+//void decodeFrameGPU(RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters);
+
+private:
+
+	cl::sycl::buffer<double, 2> bufClpBuffer2D{cl::sycl::range<2>(525, 910)};
+
+
+	cl::sycl::queue myQueue;
+
+};
+
+
