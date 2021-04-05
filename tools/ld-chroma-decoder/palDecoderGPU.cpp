@@ -34,14 +34,14 @@ double opti(double num1, double num2)
 	
 }
 
-
+/*
 void decodeFieldGPU(const SourceField &inputField, const double *chromaData, double chromaGain, RGBFrame &outputFrame)
 {
 
 	int a;
 
 }
-
+*/
 
 	struct LineInfo {
 		//explicit LineInfo(qint32 number);
@@ -146,7 +146,7 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 
 
 		//test buffer
-		cl::sycl::buffer<LineInfo> bufTest{cl::sycl::range<1>(200)};
+		//cl::sycl::buffer<LineInfo> bufTest{cl::sycl::range<1>(200)};
 
 		//buffer of structs containing pointers.
 		cl::sycl::buffer<InInfo> bufInInfo{cl::sycl::range<1>(numLinesFrame)};
@@ -157,7 +157,7 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 
 
 		//accessor of filter component structs to help calculate colour of each pixel.
-		cl::sycl::buffer<FilterComponents, 2> bufFilterComponents{cl::sycl::range<2>(numLinesFrame, 1135)};// was 1135 288
+		//cl::sycl::buffer<FilterComponents, 2> bufFilterComponents{cl::sycl::range<2>(numLinesFrame, 1135)};// was 1135 288
 		
 		//buffer of c and y filt. maybe can be calculated on GPU?
 		cl::sycl::buffer<double, 2> bufCfilt(*cfilt, cl::sycl::range<2>(7 + 1, 4));
@@ -213,7 +213,7 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 			auto accessTest = cl::sycl::accessor<LineInfo, 1, cl::sycl::access::mode::read_write, cl::sycl::access::target::local, cl::sycl::access::placeholder::false_t>(cl::sycl::range<1>(lastLine - firstLine), cgh);
 
 			//buffer test
-			auto accessBufTest = bufTest.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
+			//auto accessBufTest = bufTest.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
 			//accessor of In pointers.
 			auto accessInInfo = bufInInfo.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
@@ -224,7 +224,7 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 			auto accessN = bufN.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
 			//accessor of filter component structs to store colour components
-			auto accessFilterComponents = bufFilterComponents.get_access<cl::sycl::access::mode::read_write>(cgh);
+			//auto accessFilterComponents = bufFilterComponents.get_access<cl::sycl::access::mode::read_write>(cgh);
 
 			//accessor of cfilt and yfilt. maybe better to generate on GPU?
 			auto accessCfilt = bufCfilt.get_access<cl::sycl::access::mode::read>(cgh);
@@ -554,23 +554,23 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 				}
 
 
-				accessFilterComponents[lineNum][i].pu = PU;//PU;//testValue;//newPU;
-				accessFilterComponents[lineNum][i].qu = QU;
-				accessFilterComponents[lineNum][i].pv = PV;
-				accessFilterComponents[lineNum][i].qv = QV;
-				accessFilterComponents[lineNum][i].py = PY;
-				accessFilterComponents[lineNum][i].qy = QY;
+				//accessFilterComponents[lineNum][i].pu = PU;//PU;//testValue;//newPU;
+				//accessFilterComponents[lineNum][i].qu = QU;
+				//accessFilterComponents[lineNum][i].pv = PV;
+				//accessFilterComponents[lineNum][i].qv = QV;
+				//accessFilterComponents[lineNum][i].py = PY;
+				//accessFilterComponents[lineNum][i].qy = QY;
 
 
 
 
-			});
+			
 
 			//});
 
 /*
 			myQueue.submit([&](cl::sycl::handler& cgh)
-         	{
+			{
 			auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
 
 			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
@@ -580,7 +580,7 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 			auto accessFilterComponents = bufFilterComponents.get_access<cl::sycl::access::mode::read_write>(cgh);
 
 			auto accessSine = bufSine.get_access<cl::sycl::access::mode::read>(cgh);
-            auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::read>(cgh);
 
 			auto accessInInfo = bufInInfo.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
@@ -589,16 +589,16 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 
 			auto access_c = buff_c.get_access<cl::sycl::access::mode::write>(cgh);
 
-		const size_t lineWidth = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
+			const size_t lineWidth = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
 */
 
-			cgh.parallel_for<class decodeRGB>(cl::sycl::range<2>{numLinesFrame, lineWidth}, [=](cl::sycl::item<2> tid)
-			{
+			//cgh.parallel_for<class decodeRGB>(cl::sycl::range<2>{numLinesFrame, lineWidth}, [=](cl::sycl::item<2> tid)
+			//{
 
 				int lineNumber = (int)tid.get_id(0) / 2;
-				int lineNum = lineNumber;
+				lineNum = lineNumber;
 				int linePixel = tid.get_id(1) + accessVideoPara[0].activeVideoStart;
-				int i = linePixel;
+				i = linePixel;
 
 				int realLineNum = lineNumber + firstLine;
 
@@ -651,7 +651,7 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 				double rY;
 
 				//if statement will need to be around the line bellow if prefiltered chroma is being used, but prefiltered chroma is not supported at all at the moment
-				rY = comp[i] - ((accessFilterComponents[lineNumFull][i].py * accessSine[i] + accessFilterComponents[lineNumFull][i].qy * accessCosine[i]) * 2.0);
+				rY = comp[i] - ((PY * accessSine[i] + QY * accessCosine[i]) * 2.0);
         
 
 
@@ -659,8 +659,8 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 
 
 
-				const double rU = -(accessFilterComponents[lineNumFull][i].pu * accessLineInfo[lineNumFull].bp + accessFilterComponents[lineNumFull][i].qu * accessLineInfo[lineNumFull].bq) * scaledSaturation;
-				const double rV = accessLineInfo[lineNumFull].Vsw * -(accessFilterComponents[lineNumFull][i].qv * accessLineInfo[lineNumFull].bp - accessFilterComponents[lineNumFull][i].pv * accessLineInfo[lineNumFull].bq) * scaledSaturation;
+				const double rU = -(PU * accessLineInfo[lineNumFull].bp + QU * accessLineInfo[lineNumFull].bq) * scaledSaturation;
+				const double rV = accessLineInfo[lineNumFull].Vsw * -(QV * accessLineInfo[lineNumFull].bp - PV * accessLineInfo[lineNumFull].bq) * scaledSaturation;
 
 
 				const double R = cl::sycl::clamp(rY + (1.139883 * rV), 0.0, 65535.0);
