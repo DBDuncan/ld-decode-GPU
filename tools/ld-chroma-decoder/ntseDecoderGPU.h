@@ -37,7 +37,7 @@ public:
 	~DecodeNTSC();
 
 
-	void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFieldTwo, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, QVector<quint16> rawbuffer, double yNRLevel, double irescale, double chromaGain, bool whitePoint75);
+	void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFieldTwo, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, double yNRLevel, double irescale, double chromaGain, bool whitePoint75);
 
 //void decodeFrameGPU(RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters);
 

@@ -126,12 +126,12 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
     // Buffers for the next, current and previous frame.
     // Because we only need three of these, we allocate them upfront then
     // rotate the pointers below.
-    QScopedPointer<FrameBuffer> nextFrameBuffer, currentFrameBuffer, previousFrameBuffer;
+    //QScopedPointer<FrameBuffer> nextFrameBuffer, currentFrameBuffer, previousFrameBuffer;
     //nextFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
-    currentFrameBuffer.reset(new FrameBuffer(videoParameters, configuration)); //for GPU only need this
+    //currentFrameBuffer.reset(new FrameBuffer(videoParameters, configuration)); //for GPU only need this
     //previousFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
-/*
 
+/*
     // Decode each pair of fields into a frame.
     // To support 3D operation, where we need to see three input frames at a time,
     // each iteration of the loop loads and 1D/2D-filters frame N + 1, then
@@ -230,7 +230,9 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
 
 
     }
+
 */
+
 
 	DecodeNTSC gpuDecoder;
 
@@ -246,7 +248,7 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
         }
 
 		double ireScale = (videoParameters.white16bIre - videoParameters.black16bIre) / 100;
-		gpuDecoder.decodeFrameGPU(inputFields[fieldIndex], inputFields[fieldIndex + 1], outputFrames[frameIndex], videoParameters, currentFrameBuffer->rawbuffer, configuration.yNRLevel, ireScale, configuration.chromaGain, configuration.whitePoint75);
+		gpuDecoder.decodeFrameGPU(inputFields[fieldIndex], inputFields[fieldIndex + 1], outputFrames[frameIndex], videoParameters, configuration.yNRLevel, ireScale, configuration.chromaGain, configuration.whitePoint75);
 
 
 	}

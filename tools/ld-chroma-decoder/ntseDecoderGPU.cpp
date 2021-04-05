@@ -41,6 +41,19 @@ inline bool getLinePhase(qint32 lineNumber, int firstFieldPhaseID, int secondFie
     return isEvenLine ? isPositivePhaseOnEvenLines : !isPositivePhaseOnEvenLines;
 }
 
+__host__ __device__
+void sync()
+{
+	#ifdef SYCL_DEVICE_ONLY
+		#ifdef HIPSYCL_PLATFORM_CUDA
+		__syncthreads();
+		#endif
+	#endif
+
+}
+
+
+
 
 DecodeNTSC::DecodeNTSC()
 {}
@@ -51,7 +64,7 @@ DecodeNTSC::~DecodeNTSC()
 
 
 
-void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFieldTwo, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, QVector<quint16> rawbuffer, double yNRLevel, double irescale, double chromaGain, bool whitePoint75)
+void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFieldTwo, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, double yNRLevel, double irescale, double chromaGain, bool whitePoint75)
 {
 
 
@@ -124,14 +137,17 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 
 			//std::cout << "lines: " << lines << std::endl;
 
-			cgh.parallel_for<class split1D>(cl::sycl::range<2>{lines, width}, [=](cl::sycl::item<2> tid)
+
+/*
+
+			cgh.parallel_for<class split1D>(cl::sycl::range<2>{lines/2, width}, [=](cl::sycl::item<2> tid)
             {
 
 				int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
 				int col = tid.get_id(1) + videoParameters.activeVideoStart;
 
 
-				int lineNumTwo = tid.get_id(0) + (videoParameters.firstActiveFrameLine / 2);
+				//int lineNumTwo = tid.get_id(0);
 
 				//int finalLineNum;
 
@@ -139,6 +155,101 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 
 
 
+				//if ((tid.get_id(0) % 2) == 0)
+				//{
+					//temp = accessInputDataOne.get_pointer();
+					
+				//}
+				//else
+				//{
+					//temp = accessInputDataTwo.get_pointer();
+
+				//}
+
+
+
+				temp = accessInputDataOne.get_pointer();
+
+
+
+
+				//temp = accessInputData.get_pointer();
+
+				//dont forget divide by two here!!!
+				const unsigned short *line = temp + ((lineNum) * videoParameters.fieldWidth);
+
+				//was twos where ones
+				double tc1 = (line[col] - ((line[col - 2] + line[col + 2]) / 2.0)) / 2.0;
+
+				accessClpBuffer2D[(lineNum * 2)][col] = tc1;
+			
+
+			});
+
+
+			cgh.parallel_for<class split1DTwo>(cl::sycl::range<2>{lines/2, width}, [=](cl::sycl::item<2> tid)
+            {
+
+				int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
+				int col = tid.get_id(1) + videoParameters.activeVideoStart;
+
+
+				//int lineNumTwo = tid.get_id(0);
+
+				//int finalLineNum;
+
+				unsigned short *temp;
+
+
+				
+				//if ((tid.get_id(0) % 2) == 0)
+				//{
+					//temp = accessInputDataOne.get_pointer();
+					
+				//}
+				//else
+				//{
+					//temp = accessInputDataTwo.get_pointer();
+
+				//}
+				
+
+
+				temp = accessInputDataTwo.get_pointer();
+
+
+				//temp = accessInputData.get_pointer();
+
+				//dont forget divide by two here!!!
+				const unsigned short *line = temp + ((lineNum) * videoParameters.fieldWidth);
+
+				//was twos where ones
+				double tc1 = (line[col] - ((line[col - 2] + line[col + 2]) / 2.0)) / 2.0;
+
+				accessClpBuffer2D[(lineNum * 2) + 1][col] = tc1;
+			
+			});
+
+
+*/
+
+
+
+			cgh.parallel_for<class split1D>(cl::sycl::range<2>{lines, width}, [=](cl::sycl::item<2> tid)
+            {
+
+				int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
+				int col = tid.get_id(1) + videoParameters.activeVideoStart;
+
+
+				//int lineNumTwo = tid.get_id(0) + (videoParameters.firstActiveFrameLine / 2);
+
+				//int finalLineNum;
+
+				unsigned short *temp;
+
+
+				
 				if ((tid.get_id(0) % 2) == 0)
 				{
 					temp = accessInputDataOne.get_pointer();
@@ -149,7 +260,10 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 					temp = accessInputDataTwo.get_pointer();
 
 				}
+				
 
+
+				//temp = accessInputDataTwo.get_pointer();
 
 
 				//temp = accessInputData.get_pointer();
@@ -164,6 +278,10 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 			
 
 			});
+
+
+
+
 
 
 			cgh.parallel_for<class split2D>(cl::sycl::range<2>{lines, width}, [=](cl::sycl::item<2> tid)
@@ -404,6 +522,9 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 				{
 					comp = -comp;
 				}
+
+				//sync();	
+
 
 				//accessYIQ[lineNum][h].y = line[h] - comp;
 				double y = line[h] - comp;
