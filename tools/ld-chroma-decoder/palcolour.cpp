@@ -276,6 +276,8 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
         outputFrames[i].fill(0);
     }
 
+	DecodePAL decodeGPU;
+
     const double chromaGain = configuration.chromaGain;
     for (qint32 i = startIndex, j = 0, k = 0; i < endIndex; i += 2, j += 2, k++) {
         //decodeField(inputFields[i], chromaData[j], chromaGain, outputFrames[k]);
@@ -283,8 +285,12 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
 
 		//std::cout << "-------------------------GPU------------------------" << std::endl;
 				//std::cout << typeid(videoParameters).name() << std::endl;
-				decodeFieldGPU(inputFields[i], inputFields[i + 1], chromaData[j], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
-				//decodeFieldGPU(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
+		//decodeFieldGPU(inputFields[i], inputFields[i + 1], chromaData[j], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
+		
+		decodeGPU.decodeFieldGPU(inputFields[i], inputFields[i + 1], chromaData[j], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
+
+
+		//decodeFieldGPU(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
 		//std::cout << "-------------------------CPU------------------------" << std::endl;
     }
 

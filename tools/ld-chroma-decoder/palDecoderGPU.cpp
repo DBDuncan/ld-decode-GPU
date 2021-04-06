@@ -21,6 +21,19 @@
 
 //a change
 
+
+DecodePAL::DecodePAL()
+{}
+
+DecodePAL::~DecodePAL()
+{}
+
+
+
+
+
+
+
 __host__ __device__
 double opti(double num1, double num2)
 {
@@ -43,6 +56,7 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 }
 */
 
+/*
 	struct LineInfo {
 		//explicit LineInfo(qint32 number);
 
@@ -50,8 +64,10 @@ void decodeFieldGPU(const SourceField &inputField, const double *chromaData, dou
 		double bp, bq;
 		double Vsw;
 	};
+*/
 
 
+/*
 struct InInfo {
 
 	const unsigned short* in0;
@@ -77,10 +93,10 @@ struct FilterComponents {
 
 
 };
+*/
 
 
-
-void decodeFieldGPU(const SourceField &inputField, const SourceField &inputFieldTwo, const double *chromaData, double chromaGain, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, double sine[], double cosine[], double cfilt[][4], double yfilt[][2])
+void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField &inputFieldTwo, const double *chromaData, double chromaGain, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, double sine[], double cosine[], double cfilt[][4], double yfilt[][2])
 {
 	//work in progress
 
@@ -100,17 +116,22 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 
 	int numLinesField = lastLine - firstLine;
 
+	//576
 	const size_t numLinesFrame = numLinesField * 2;
+
+
+	//std::cout << "numLinesFrame" << numLinesFrame << std::endl;
+
 
 	//std::iota(lines.begin(), lines.end(), firstLine);
 
 	int colourBurstLength = videoParameters.colourBurstEnd - videoParameters.colourBurstStart;
 
 	//array for test outputs
-	std::vector<double> c(100);
+	//std::vector<double> c(100);
 
 
-	//std::cout << numLinesField << " : " << numLinesFrame << std::endl;
+	//std::cout << numLinesFrame << " : " << numLinesFrame << std::endl;
 
 	//std::cout << "width: " << lastLine - firstLine << std::endl;
 
@@ -124,7 +145,7 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 		cl::sycl::queue myQueue;
 
 		//buffer for accessing test data
-		cl::sycl::buffer<double> buff_c(c.data(), c.size());
+		//cl::sycl::buffer<double> buff_c(c.data(), c.size());
 
 		//buffer for sine and cosine. need to look into calculating data on GPU
 		cl::sycl::buffer<double> bufSine(sine, cl::sycl::range<1>(1135));
@@ -142,18 +163,18 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 
 		//buffer for lineinfo structs
 		//cl::sycl::buffer<LineInfo> bufLineInfo(lineInfos.data(), cl::sycl::range<1>(lastLine - firstLine));
-		cl::sycl::buffer<LineInfo> bufLineInfo{cl::sycl::range<1>(numLinesFrame)};//was lastLine - firstLine
+		//cl::sycl::buffer<LineInfo> bufLineInfo{cl::sycl::range<1>(numLinesFrame)};//was lastLine - firstLine
 
 
 		//test buffer
 		//cl::sycl::buffer<LineInfo> bufTest{cl::sycl::range<1>(200)};
 
 		//buffer of structs containing pointers.
-		cl::sycl::buffer<InInfo> bufInInfo{cl::sycl::range<1>(numLinesFrame)};
+		//cl::sycl::buffer<InInfo> bufInInfo{cl::sycl::range<1>(numLinesFrame)};
 
 		//first two nums are set, last is of how many lines.
-		cl::sycl::buffer<double, 3> bufM{cl::sycl::range<3>(4, 1135, numLinesFrame)};
-		cl::sycl::buffer<double, 3> bufN{cl::sycl::range<3>(4, 1135, numLinesFrame)};
+		//cl::sycl::buffer<double, 3> bufM{cl::sycl::range<3>(4, 1135, numLinesFrame)};
+		//cl::sycl::buffer<double, 3> bufN{cl::sycl::range<3>(4, 1135, numLinesFrame)};
 
 
 		//accessor of filter component structs to help calculate colour of each pixel.
@@ -176,7 +197,7 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 		cl::sycl::buffer<LdDecodeMetaData::VideoParameters> bufVideoPara(&videoParameters, cl::sycl::range<1>(1));
 
 
-		cl::sycl::buffer<unsigned short> bufBlackLine{cl::sycl::range<1>(1135)};
+		//cl::sycl::buffer<unsigned short> bufBlackLine{cl::sycl::range<1>(1135)};
 
 		//keep for easy output of GPU device on system
 		//std::cout << "Running on "
@@ -192,7 +213,7 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 		myQueue.submit([&](cl::sycl::handler& cgh)
 		{
 			//accessor of buffer used to output test data
-			auto access_c = buff_c.get_access<cl::sycl::access::mode::write>(cgh);
+			//auto access_c = buff_c.get_access<cl::sycl::access::mode::write>(cgh);
 
 			//accessor of sine and cosine data. Need to look into calculating sine and cosine when needed on GPU
 			auto accessSine = bufSine.get_access<cl::sycl::access::mode::read>(cgh);
@@ -210,7 +231,7 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 
 
 			//test accessor
-			auto accessTest = cl::sycl::accessor<LineInfo, 1, cl::sycl::access::mode::read_write, cl::sycl::access::target::local, cl::sycl::access::placeholder::false_t>(cl::sycl::range<1>(lastLine - firstLine), cgh);
+			//auto accessTest = cl::sycl::accessor<LineInfo, 1, cl::sycl::access::mode::read_write, cl::sycl::access::target::local, cl::sycl::access::placeholder::false_t>(cl::sycl::range<1>(lastLine - firstLine), cgh);
 
 			//buffer test
 			//auto accessBufTest = bufTest.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
