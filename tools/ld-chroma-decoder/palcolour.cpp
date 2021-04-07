@@ -199,7 +199,7 @@ void PalColour::buildLookUpTables()
     //
     // We may wish to broaden vertical bandwidth *slightly* so as to better
     // pass one- or two-line colour bars - underlines/graphics etc.
-
+/*
     double cdiv = 0, ydiv = 0;
     for (qint32 f = 0; f <= FILTER_SIZE; f++) {
         // 0-2-4-6 sequence here because we're only processing one field.
@@ -254,6 +254,21 @@ void PalColour::buildLookUpTables()
             yfilt[f][i] /= ydiv;
         }
     }
+*/
+/*
+	for (qint32 f = 0; f <= FILTER_SIZE; f++) {
+	std::cout << std::endl << "cfilt: " << std::endl;
+		for (qint32 i = 0; i < 4; i++) {
+	
+			std::cout << cfilt[f][i] << " ";
+		}
+		std::cout << std::endl << "yfilt" << std::endl;
+		for (qint32 i = 0; i < 2; i++) {
+			std::cout << yfilt[f][i] << " ";
+
+		}
+	}
+*/
 }
 
 void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 startIndex, qint32 endIndex,
@@ -276,7 +291,16 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
         outputFrames[i].fill(0);
     }
 
-	DecodePAL decodeGPU;
+	//setupWaves(sine, cosine);
+
+
+	//DecodePAL::setupSine(sine, cosine);
+
+	DecodePAL decodeGPU(sine, cosine);
+
+	
+
+
 
     const double chromaGain = configuration.chromaGain;
     for (qint32 i = startIndex, j = 0, k = 0; i < endIndex; i += 2, j += 2, k++) {

@@ -22,13 +22,68 @@
 //a change
 
 
-DecodePAL::DecodePAL()
-{}
+DecodePAL::DecodePAL(double sine[], double cosine[])
+{
+
+	
+	//cl::sycl::buffer<double> bufSin{sine, cl::sycl::range<1>(1135)};
+	//cl::sycl::buffer<double> bufCosin{cosine, cl::sycl::range<1>(1135)};
+
+	//bufSine{sine, cl::sycl::range<1>(1135)};
+
+	//bufCosine{cosine, cl::sycl::range<1>(1135)};
+
+	
+	cl::sycl::buffer<double> bufSineTemp(sine, cl::sycl::range<1>(1135));
+	cl::sycl::buffer<double> bufCosineTemp(cosine, cl::sycl::range<1>(1135));
+
+	myQueue.submit([&](cl::sycl::handler& cgh)
+	{
+
+		auto accessSineTemp = bufSineTemp.get_access<cl::sycl::access::mode::read>(cgh);
+
+		auto accessCosineTemp = bufCosineTemp.get_access<cl::sycl::access::mode::read>(cgh);
+
+		auto accessSine = bufSine.get_access<cl::sycl::access::mode::discard_write>(cgh);
+		auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::discard_write>(cgh);
+
+
+		cgh.parallel_for<class initData>(cl::sycl::range<1>{1135}, [=](cl::sycl::item<1> tid)
+		{
+			int i = tid.get_id(0);
+
+
+			accessSine[i] = accessSineTemp[i];
+			accessCosine[i] = accessCosineTemp[i];
+
+
+
+		});
+
+
+
+
+
+
+	});
+
+}
 
 DecodePAL::~DecodePAL()
 {}
 
+/*
+void DecodePAL::setupSine(double sine[], double cosine[])
+{
 
+	m_sine = sine;
+
+	m_cosine = cosine;
+
+
+
+}
+*/
 
 
 
@@ -142,14 +197,14 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 	{
 
 		//queue which is used to execure kernel jobs
-		cl::sycl::queue myQueue;
+		//cl::sycl::queue myQueue;
 
 		//buffer for accessing test data
 		//cl::sycl::buffer<double> buff_c(c.data(), c.size());
 
 		//buffer for sine and cosine. need to look into calculating data on GPU
-		cl::sycl::buffer<double> bufSine(sine, cl::sycl::range<1>(1135));
-		cl::sycl::buffer<double> bufCosine(cosine, cl::sycl::range<1>(1135));
+		//cl::sycl::buffer<double> bufSine(sine, cl::sycl::range<1>(1135));
+		//cl::sycl::buffer<double> bufCosine(cosine, cl::sycl::range<1>(1135));
 
 		//buffer for input dataa
 		const qint32 frameHeightTwo = (videoParameters.fieldHeight * 2) - 1;
@@ -181,8 +236,8 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 		//cl::sycl::buffer<FilterComponents, 2> bufFilterComponents{cl::sycl::range<2>(numLinesFrame, 1135)};// was 1135 288
 		
 		//buffer of c and y filt. maybe can be calculated on GPU?
-		cl::sycl::buffer<double, 2> bufCfilt(*cfilt, cl::sycl::range<2>(7 + 1, 4));
-		cl::sycl::buffer<double, 2> bufYfilt(*yfilt, cl::sycl::range<2>(7 + 1, 2));
+		//cl::sycl::buffer<double, 2> bufCfilt(*cfilt, cl::sycl::range<2>(7 + 1, 4));
+		//cl::sycl::buffer<double, 2> bufYfilt(*yfilt, cl::sycl::range<2>(7 + 1, 2));
 
 
 		//output buffer
@@ -248,8 +303,8 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 			//auto accessFilterComponents = bufFilterComponents.get_access<cl::sycl::access::mode::read_write>(cgh);
 
 			//accessor of cfilt and yfilt. maybe better to generate on GPU?
-			auto accessCfilt = bufCfilt.get_access<cl::sycl::access::mode::read>(cgh);
-			auto accessYfilt = bufYfilt.get_access<cl::sycl::access::mode::read>(cgh); 
+			//auto accessCfilt = bufCfilt.get_access<cl::sycl::access::mode::read>(cgh);
+			//auto accessYfilt = bufYfilt.get_access<cl::sycl::access::mode::read>(cgh); 
 
 			//accessor of output
 			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::write>(cgh);//changed from read_write
@@ -323,11 +378,24 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 				double bp = 0.0, bq = 0.0, bpo = 0.0, bqo = 0.0;
 
+				//double pi = 3.14159265359;
+
 				for (unsigned int i = accessVideoPara[0].colourBurstStart; i < accessVideoPara[0].colourBurstEnd; i++) {
+				
+				//const double rad = 2 * 3.14159265358979323846264338327950288 * i * videoParameters.fsc / videoParameters.sampleRate;
+				//double sine = cl::sycl::sin(rad);
+				//double cosine = cl::sycl::cos(rad);
+
+
+
 				bp += ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessSine[i];
 				bq += ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessCosine[i];
 				bpo += ((in2[i] - in1[i]) / 2.0) * accessSine[i];
 				bqo += ((in2[i] - in1[i]) / 2.0) * accessCosine[i];
+				
+				//accessSine[i] = sine;
+				//accessCosine[i] = cosine;
+
 				}
 
 
@@ -440,6 +508,17 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 
 				//accessM[0][col][line] = num * numTwo;
+
+
+
+
+				//const double rad = 2 * 3.14159265358979323846264338327950288 * col * videoParameters.fsc / videoParameters.sampleRate;
+				//double sine = cl::sycl::sin(rad);
+				//double cosine = cl::sycl::cos(rad);
+
+
+
+
 				accessM[0][col][line] =  accessInInfo[line].in0[col] * accessSine[col];
 				accessM[2][col][line] =  accessInInfo[line].in1[col] * accessSine[col] - accessInInfo[line].in2[col] * accessSine[col];
 				accessM[1][col][line] = -accessInInfo[line].in3[col] * accessSine[col] - accessInInfo[line].in4[col] * accessSine[col];
@@ -494,6 +573,38 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				// U and V are the same for lines n ([0]), n+/-2 ([1]), but
 				// differ in sign for n+/-1 ([2]), n+/-3 ([3]) owing to the
 				// forward/backward axis slant.
+
+
+				double accessYfilt[8][2] =
+				{
+					{0.0577985, 0.00517164},
+					{0.110596, 0.00975213},
+					{0.0964581, 0.00810742},
+					{0.0756302, 0.00577103},
+					{0.0517164, 0.00326939},
+					{0.0288551, 0.00119304},
+					{0.0110026, 8.27732e-05},
+					{0.00124825, 0.0}
+
+				};
+
+
+				double accessCfilt[8][4] =
+				{
+					
+					{0.0190385, 0.00851754, 0.0158864, 0.0018121},
+					{0.0364297, 0.0160615, 0.0303127, 0.003246},
+					{0.0317727, 0.0133527, 0.0261979, 0.00225146},
+					{0.0249121, 0.00950472, 0.0201777, 0.00103026},
+					{0.0170351, 0.00538458, 0.0133527, 0.000136325},
+					{0.00950472, 0.00196491, 0.0069803, 0},
+					{0.0036242, 0.000136325, 0.00225146, 0},
+					{0.000411166, 0, 7.84703e-05, 0}
+
+
+
+				};
+
 
 
 				int start = 0;
@@ -670,6 +781,13 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 
 				double rY;
+
+
+				//const double rad = 2 * 3.14159265358979323846264338327950288 * i * videoParameters.fsc / videoParameters.sampleRate;
+				//double sine = cl::sycl::sin(rad);
+				//double cosine = cl::sycl::cos(rad);
+
+
 
 				//if statement will need to be around the line bellow if prefiltered chroma is being used, but prefiltered chroma is not supported at all at the moment
 				rY = comp[i] - ((PY * accessSine[i] + QY * accessCosine[i]) * 2.0);

@@ -36,6 +36,19 @@ struct InInfo {
 };
 
 
+	//double m_sine[];
+	//double m_cosine[];
+
+/*
+	void setupWaves(double sine[], double cosine[])
+	{
+		m_sine = &sine;
+		m_cosine = &cosine;
+
+
+	}
+*/
+
 
 
 //void decodeFieldGPU(const SourceField &inputField, const double *chromaData, double chromaGain, RGBFrame &outputFrame);
@@ -43,9 +56,12 @@ struct InInfo {
 class DecodePAL {
 
 public:
-	DecodePAL();
+	DecodePAL(double sine[], double cosine[]);
 
 	~DecodePAL();
+
+
+	//static void setupSine(double sine[], double cosine[]);
 
 
 
@@ -53,6 +69,13 @@ void decodeFieldGPU(const SourceField &inputField, const SourceField &inputField
 
 
 private:
+
+
+	//static double m_sine[];
+	//static double m_cosine[];
+
+	cl::sycl::queue myQueue;
+
 
 	cl::sycl::buffer<LineInfo> bufLineInfo{cl::sycl::range<1>(576)};
 
@@ -63,6 +86,10 @@ private:
 
 	cl::sycl::buffer<unsigned short> bufBlackLine{cl::sycl::range<1>(1135)};
 
+	cl::sycl::buffer<double> bufSine{cl::sycl::range<1>(1135)};
+	cl::sycl::buffer<double> bufCosine{cl::sycl::range<1>(1135)};
+
+	
 
 };
 
