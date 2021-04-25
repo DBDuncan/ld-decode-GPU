@@ -104,6 +104,11 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 
 		cl::sycl::buffer<unsigned short> bufOutput{outputFrame.data(), cl::sycl::range<1>(videoParameters.fieldWidth * frameHeight * 3)};
 
+		const size_t lines = videoParameters.lastActiveFrameLine - videoParameters.firstActiveFrameLine;
+		const size_t width = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
+
+
+
 
         myQueue.submit([&](cl::sycl::handler& cgh)
 		{
@@ -122,18 +127,18 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 
 			//auto accessClpBuffer1D = bufClpBuffer1D.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
-			auto accessClpBuffer2D = bufClpBuffer2D.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
+			auto accessClpBuffer2D = bufClpBuffer2D.get_access<cl::sycl::access::mode::discard_write>(cgh);
 
 
 			//auto accessYIQ = bufYIQ.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
 
-			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::discard_read_write>(cgh);//change later to discard_write
+			//auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::discard_read_write>(cgh);//change later to discard_write
 
 
-			const size_t lines = videoParameters.lastActiveFrameLine - videoParameters.firstActiveFrameLine;
+			//const size_t lines = videoParameters.lastActiveFrameLine - videoParameters.firstActiveFrameLine;
 
-			const size_t width = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
+			//const size_t width = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
 
 			//std::cout << "lines: " << lines << std::endl;
 
@@ -232,8 +237,7 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 
 
 */
-
-
+			
 
 			cgh.parallel_for<class split1D>(cl::sycl::range<2>{lines, width}, [=](cl::sycl::item<2> tid)
             {
@@ -279,10 +283,12 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 
 			});
 
+		});
 
 
-
-
+		myQueue.submit([&](cl::sycl::handler& cgh)
+		{
+			auto accessClpBuffer2D = bufClpBuffer2D.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
 			cgh.parallel_for<class split2D>(cl::sycl::range<2>{lines, width}, [=](cl::sycl::item<2> tid)
             {
@@ -366,7 +372,17 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 
 			});
 
+		});
 
+		myQueue.submit([&](cl::sycl::handler& cgh)
+		{
+			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::discard_write>(cgh);
+			auto accessClpBuffer2D = bufClpBuffer2D.get_access<cl::sycl::access::mode::read>(cgh);
+
+
+
+			auto accessInputDataOne = bufInputDataOne.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessInputDataTwo = bufInputDataTwo.get_access<cl::sycl::access::mode::read>(cgh);
 
 
 			cgh.parallel_for<class splitIQ>(cl::sycl::range<2>{lines, width}, [=](cl::sycl::item<2> tid)
