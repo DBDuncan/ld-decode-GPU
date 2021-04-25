@@ -99,7 +99,7 @@ double opti(double num1, double num2)
 		return max(num1, num2);
 		#endif
 	#endif
-	
+	return 0;	
 }
 
 /*
@@ -160,6 +160,10 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 	const qint32 firstLine = inputField.getFirstActiveLine(videoParameters);
 	const qint32 lastLine = inputField.getLastActiveLine(videoParameters);
 	//22 310
+
+	const int offset = inputField.getOffset();
+
+	//std::cout << offset << std::endl;
 
 	const qint32 firstLineFieldTwo = inputFieldTwo.getFirstActiveLine(videoParameters);
 
@@ -292,12 +296,12 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 			//auto accessBufTest = bufTest.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
 			//accessor of In pointers.
-			auto accessInInfo = bufInInfo.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
+			///auto accessInInfo = bufInInfo.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
 
 			//M and N array accessors
-			auto accessM = bufM.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
-			auto accessN = bufN.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
+			///auto accessM = bufM.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
+			///auto accessN = bufN.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
 			//accessor of filter component structs to store colour components
 			//auto accessFilterComponents = bufFilterComponents.get_access<cl::sycl::access::mode::read_write>(cgh);
@@ -307,7 +311,7 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 			//auto accessYfilt = bufYfilt.get_access<cl::sycl::access::mode::read>(cgh); 
 
 			//accessor of output
-			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::write>(cgh);//changed from read_write
+			//auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::write>(cgh);//changed from read_write
 
 			//test accessor of PU
 			//auto accessPU = bufPU.get_access<cl::sycl::access::mode::read_write>(cgh);
@@ -330,8 +334,8 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 
 
-
-				accessLineInfo[lineNum].number = (lineNum / 2) + accessFirstLineNum[0];//lineNum + accessFirstLineNum[0];
+				//not used at all
+				//accessLineInfo[lineNum].number = (lineNum / 2) + accessFirstLineNum[0];//lineNum + accessFirstLineNum[0];
 
 
 				//static constexpr quint16 blackLine[1135] = {0};
@@ -436,6 +440,89 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 
 
+/*
+				//inserted part from another function because this needs to run just one on each line anyway
+
+				//static constexpr unsigned int blackLine[1135] = {0};
+
+				// Get pointers to the surrounding lines of input data.
+				// If a line we need is outside the active area, use blackLine instead.
+				const qint32 firstLine2 = firstLine;//inputField.getFirstActiveLine(videoParameters);//look into replacing with accessors
+				const qint32 lastLine2 = lastLine;//inputField.getLastActiveLine(videoParameters);
+				const unsigned short *in0Two, *in1Two, *in2Two, *in3Two, *in4Two, *in5Two, *in6Two;
+				in0Two =                                               pointerInputData +  (fullLineNum      * accessVideoPara[0].fieldWidth);
+				in1Two = (fullLineNum - 1) <  firstLine2 ? blackLine : (pointerInputData + ((fullLineNum - 1) * accessVideoPara[0].fieldWidth));
+				in2Two = (fullLineNum + 1) >= lastLine2  ? blackLine : (pointerInputData + ((fullLineNum + 1) * accessVideoPara[0].fieldWidth));
+				in3Two = (fullLineNum - 2) <  firstLine2 ? blackLine : (pointerInputData + ((fullLineNum - 2) * accessVideoPara[0].fieldWidth));
+				in4Two = (fullLineNum + 2) >= lastLine2  ? blackLine : (pointerInputData + ((fullLineNum + 2) * accessVideoPara[0].fieldWidth));
+				in5Two = (fullLineNum - 2) <  firstLine2 ? blackLine : (pointerInputData + ((fullLineNum - 3) * accessVideoPara[0].fieldWidth));
+				in6Two = (fullLineNum + 3) >= lastLine2  ? blackLine : (pointerInputData + ((fullLineNum + 3) * accessVideoPara[0].fieldWidth));
+
+				accessInInfo[lineNum].in0 = in0Two;
+				accessInInfo[lineNum].in1 = in1Two;
+				accessInInfo[lineNum].in2 = in2Two;
+				accessInInfo[lineNum].in3 = in3Two;
+				accessInInfo[lineNum].in4 = in4Two;
+				accessInInfo[lineNum].in5 = in5Two;
+				accessInInfo[lineNum].in6 = in6Two;
+*/
+/*
+				//test code
+				if (tid.get_id(0) == 1)
+				{
+
+					access_c[0] = accessLineInfo[lineNum].bp;//in0[0];
+					//access_c[1] = (lineNum + accessFirstLineNum[0])      * accessVideoPara[0].fieldWidth;
+					//access_c[0] = 5.0;
+					//access_c[2] = lineNum + accessFirstLineNum[0];
+					access_c[3] = in0[182];
+				}
+*/
+			});
+
+		});
+
+
+		myQueue.submit([&](cl::sycl::handler& cgh)
+		{
+
+
+			//accessor of input data
+			auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessInputDataTwo = bufInputDataTwo.get_access<cl::sycl::access::mode::read>(cgh);
+
+
+			auto accessInInfo = bufInInfo.get_access<cl::sycl::access::mode::discard_write>(cgh);
+
+			auto accessBlackLine = bufBlackLine.get_access<cl::sycl::access::mode::read>(cgh);
+
+			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
+
+			auto accessFirstLineNum = bufFirstLineNum.get_access<cl::sycl::access::mode::read>(cgh);
+
+			cgh.parallel_for<class detectBurstsTwo>(cl::sycl::range<1>{numLinesFrame}, [=](cl::sycl::item<1> tid)
+			{
+			
+				int lineNum = tid.get_id(0);
+
+				int fullLineNum = (lineNum / 2) + accessFirstLineNum[0];
+				unsigned short *blackLine = accessBlackLine.get_pointer();
+				unsigned short *temp;
+
+				if ((tid.get_id(0) % 2) == 0)//was == 0
+				{
+					temp = accessInputData.get_pointer();
+				}
+				else
+				{
+					temp = accessInputDataTwo.get_pointer();
+				}
+
+
+
+				unsigned short *pointerInputData = temp;
+
+
 
 				//inserted part from another function because this needs to run just one on each line anyway
 
@@ -443,8 +530,8 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 				// Get pointers to the surrounding lines of input data.
 				// If a line we need is outside the active area, use blackLine instead.
-				const qint32 firstLine2 = inputField.getFirstActiveLine(videoParameters);//look into replacing with accessors
-				const qint32 lastLine2 = inputField.getLastActiveLine(videoParameters);
+				const qint32 firstLine2 = firstLine;//inputField.getFirstActiveLine(videoParameters);//look into replacing with accessors
+				const qint32 lastLine2 = lastLine;//inputField.getLastActiveLine(videoParameters);
 				const unsigned short *in0Two, *in1Two, *in2Two, *in3Two, *in4Two, *in5Two, *in6Two;
 				in0Two =                                               pointerInputData +  (fullLineNum      * accessVideoPara[0].fieldWidth);
 				in1Two = (fullLineNum - 1) <  firstLine2 ? blackLine : (pointerInputData + ((fullLineNum - 1) * accessVideoPara[0].fieldWidth));
@@ -462,19 +549,20 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				accessInInfo[lineNum].in5 = in5Two;
 				accessInInfo[lineNum].in6 = in6Two;
 
-/*
-				//test code
-				if (tid.get_id(0) == 1)
-				{
 
-					access_c[0] = accessLineInfo[lineNum].bp;//in0[0];
-					//access_c[1] = (lineNum + accessFirstLineNum[0])      * accessVideoPara[0].fieldWidth;
-					//access_c[0] = 5.0;
-					//access_c[2] = lineNum + accessFirstLineNum[0];
-					access_c[3] = in0[182];
-				}
-*/
+
+
+
+
+
+
+
+
 			});
+
+
+		});
+
 
 			//this cuda function works here!!!!!
 			//cudaDeviceSynchronize();
@@ -482,6 +570,46 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 			const size_t lineWidthCustom = videoParameters.activeVideoEnd - videoParameters.activeVideoStart + 1 + 7;
 
 			//std::cout << "numLinesFrame: " << numLinesFrame << std::endl;
+
+
+		myQueue.submit([&](cl::sycl::handler& cgh)
+		{
+			//accessor of In pointers.
+			auto accessInInfo = bufInInfo.get_access<cl::sycl::access::mode::read>(cgh);
+
+
+			//M and N array accessors
+			auto accessM = bufM.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
+			auto accessN = bufN.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
+
+			//accessor of filter component structs to store colour components
+			//auto accessFilterComponents = bufFilterComponents.get_access<cl::sycl::access::mode::read_write>(cgh);
+
+			//accessor of cfilt and yfilt. maybe better to generate on GPU?
+			//auto accessCfilt = bufCfilt.get_access<cl::sycl::access::mode::read>(cgh);
+			//auto accessYfilt = bufYfilt.get_access<cl::sycl::access::mode::read>(cgh); 
+
+			//accessor of output
+			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::write>(cgh);//changed from read_write
+
+			
+			//accessor of input data
+			auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessInputDataTwo = bufInputDataTwo.get_access<cl::sycl::access::mode::read>(cgh);
+
+
+
+			//accessor of sine and cosine data. Need to look into calculating sine and cosine when needed on GPU
+			auto accessSine = bufSine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::read>(cgh);
+
+
+			auto accessLineInfo = bufLineInfo.get_access<cl::sycl::access::mode::read>(cgh);
+
+
+			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
+
+			auto accessFirstLineNum = bufFirstLineNum.get_access<cl::sycl::access::mode::read>(cgh);
 
 
 			cgh.parallel_for<class createMandN>(cl::sycl::range<2>{numLinesFrame, lineWidthCustom}, [=](cl::sycl::item<2> tid)
@@ -767,8 +895,8 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				// Pointer to composite signal data
 				const unsigned short *comp = tempTwo + (realLineNum * accessVideoPara[0].fieldWidth);
 
-				// Define scan line pointer to output buffer using 16 bit unsigned words
-				unsigned short *ptr = temp + (((realLineNum * 2) + inputField.getOffset()) * accessVideoPara[0].fieldWidth * 3) + (addedNum * accessVideoPara[0].fieldWidth * 3);
+				// Define scan line pointer to output buffer using 16 bit unsigned words //was inputField.getOffset() where zero is
+				unsigned short *ptr = temp + (((realLineNum * 2) + 0) * accessVideoPara[0].fieldWidth * 3) + (addedNum * accessVideoPara[0].fieldWidth * 3);
 
 				// Gain for the Y component, to put reference black at 0 and reference white at 65535
 				const double scaledContrast = 65535.0 / (accessVideoPara[0].white16bIre - accessVideoPara[0].black16bIre);
