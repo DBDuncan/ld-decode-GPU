@@ -267,6 +267,239 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 	//std::cout << "max work group size: " << myQueue.get_device().get_info<cl::sycl::info::device::max_work_group_size>();
 
 
+		//std::cout << "colour burst length: " << videoParameters.colourBurstEnd - videoParameters.colourBurstStart << std::endl;
+
+/*
+		myQueue.submit([&](cl::sycl::handler& cgh)
+		{
+			auto accessbp = bufBurstPrecalcbp.get_access<cl::sycl::access::mode::discard_write>(cgh);
+			auto accessbq = bufBurstPrecalcbp.get_access<cl::sycl::access::mode::discard_write>(cgh);
+			auto accessbpo = bufBurstPrecalcbp.get_access<cl::sycl::access::mode::discard_write>(cgh);
+			auto accessbqo = bufBurstPrecalcbp.get_access<cl::sycl::access::mode::discard_write>(cgh);
+			auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessInputDataTwo = bufInputDataTwo.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessBlackLine = bufBlackLine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessSine = bufSine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessFirstLineNum = bufFirstLineNum.get_access<cl::sycl::access::mode::read>(cgh);
+
+			cgh.parallel_for<class precalcBurstbp>(cl::sycl::range<2>{numLinesFrame, 40}, [=](cl::sycl::item<2> tid)
+			{
+				int line = tid.get_id(0);
+				int col = tid.get_id(1);
+				int i = col + accessVideoPara[0].colourBurstStart;
+
+				unsigned short *blackLine = accessBlackLine.get_pointer();
+
+
+				//unsigned short *pointerInputData = accessInputData.get_pointer();
+
+				unsigned short *temp;
+
+				if ((tid.get_id(0) % 2) == 0)//was == 0
+				{
+					temp = accessInputData.get_pointer();
+				}
+				else
+				{
+					temp = accessInputDataTwo.get_pointer();
+				}
+
+
+
+				unsigned short *pointerInputData = temp;
+
+				int fullLineNum = (line / 2) + accessFirstLineNum[0];
+
+
+				const unsigned short *in0, *in1, *in2, *in3, *in4;
+				in0 =                                                                 pointerInputData +  (fullLineNum      * accessVideoPara[0].fieldWidth);
+				in1 = (fullLineNum - 1) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 1) * accessVideoPara[0].fieldWidth));
+				in2 = (fullLineNum + 1) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 1) * accessVideoPara[0].fieldWidth));
+				in3 = (fullLineNum - 2) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 2) * accessVideoPara[0].fieldWidth));
+				in4 = (fullLineNum + 2) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 2) * accessVideoPara[0].fieldWidth));
+
+				accessbp[line][col] = ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessSine[i];
+				accessbq[line][col] = ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessCosine[i];
+				accessbpo[line][col] = ((in2[i] - in1[i]) / 2.0) * accessSine[i];
+				accessbqo[line][col] = ((in2[i] - in1[i]) / 2.0) * accessCosine[i];
+			});
+		});
+
+
+
+		myQueue.submit([&](cl::sycl::handler& cgh)
+		{
+			auto accessbq = bufBurstPrecalcbq.get_access<cl::sycl::access::mode::discard_write>(cgh);
+			auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessInputDataTwo = bufInputDataTwo.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessBlackLine = bufBlackLine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessSine = bufSine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessFirstLineNum = bufFirstLineNum.get_access<cl::sycl::access::mode::read>(cgh);
+
+			cgh.parallel_for<class precalcBurstbq>(cl::sycl::range<2>{numLinesFrame, 40}, [=](cl::sycl::item<2> tid)
+			{
+				int line = tid.get_id(0);
+				int col = tid.get_id(1);
+					
+				int i = col + accessVideoPara[0].colourBurstStart;
+
+				unsigned short *blackLine = accessBlackLine.get_pointer();
+
+
+				//unsigned short *pointerInputData = accessInputData.get_pointer();
+
+				unsigned short *temp;
+
+				if ((tid.get_id(0) % 2) == 0)//was == 0
+				{
+					temp = accessInputData.get_pointer();
+				}
+				else
+				{
+					temp = accessInputDataTwo.get_pointer();
+				}
+
+
+
+				unsigned short *pointerInputData = temp;
+
+				int fullLineNum = (line / 2) + accessFirstLineNum[0];
+
+
+				const unsigned short *in0, *in1, *in2, *in3, *in4;
+				in0 =                                                                 pointerInputData +  (fullLineNum      * accessVideoPara[0].fieldWidth);
+				//in1 = (fullLineNum - 1) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 1) * accessVideoPara[0].fieldWidth));
+				//in2 = (fullLineNum + 1) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 1) * accessVideoPara[0].fieldWidth));
+				in3 = (fullLineNum - 2) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 2) * accessVideoPara[0].fieldWidth));
+				in4 = (fullLineNum + 2) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 2) * accessVideoPara[0].fieldWidth));
+
+				//accessbp[line][col] = ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessSine[i];
+				accessbq[line][col] = ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessCosine[i];
+				//accessbpo = ((in2[i] - in1[i]) / 2.0) * accessSine[i];
+				//accessbqo = ((in2[i] - in1[i]) / 2.0) * accessCosine[i];
+			});
+		});
+
+
+		myQueue.submit([&](cl::sycl::handler& cgh)
+		{
+			auto accessbpo = bufBurstPrecalcbpo.get_access<cl::sycl::access::mode::discard_write>(cgh);
+			auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessInputDataTwo = bufInputDataTwo.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessBlackLine = bufBlackLine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessSine = bufSine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessFirstLineNum = bufFirstLineNum.get_access<cl::sycl::access::mode::read>(cgh);
+
+
+			cgh.parallel_for<class precalcBurstbpo>(cl::sycl::range<2>{numLinesFrame, 40}, [=](cl::sycl::item<2> tid)
+			{
+				int line = tid.get_id(0);
+				int col = tid.get_id(1);
+
+				int i = col + accessVideoPara[0].colourBurstStart;
+
+				unsigned short *blackLine = accessBlackLine.get_pointer();
+
+
+				//unsigned short *pointerInputData = accessInputData.get_pointer();
+
+				unsigned short *temp;
+
+				if ((tid.get_id(0) % 2) == 0)//was == 0
+				{
+					temp = accessInputData.get_pointer();
+				}
+				else
+				{
+					temp = accessInputDataTwo.get_pointer();
+				}
+
+
+
+				unsigned short *pointerInputData = temp;
+
+				int fullLineNum = (line / 2) + accessFirstLineNum[0];
+
+
+				const unsigned short *in0, *in1, *in2, *in3, *in4;
+				//in0 =                                                                 pointerInputData +  (fullLineNum      * accessVideoPara[0].fieldWidth);
+				in1 = (fullLineNum - 1) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 1) * accessVideoPara[0].fieldWidth));
+				in2 = (fullLineNum + 1) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 1) * accessVideoPara[0].fieldWidth));
+				//in3 = (fullLineNum - 2) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 2) * accessVideoPara[0].fieldWidth));
+				//in4 = (fullLineNum + 2) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 2) * accessVideoPara[0].fieldWidth));
+
+				//accessbp[line][col] = ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessSine[i];
+				//accessbq = ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessCosine[i];
+				accessbpo[line][col] = ((in2[i] - in1[i]) / 2.0) * accessSine[i];
+				//accessbqo = ((in2[i] - in1[i]) / 2.0) * accessCosine[i];
+			});
+		});
+
+
+		myQueue.submit([&](cl::sycl::handler& cgh)
+		{
+			auto accessbqo = bufBurstPrecalcbqo.get_access<cl::sycl::access::mode::discard_write>(cgh);
+			auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessInputDataTwo = bufInputDataTwo.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessBlackLine = bufBlackLine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessSine = bufSine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
+			auto accessFirstLineNum = bufFirstLineNum.get_access<cl::sycl::access::mode::read>(cgh);
+
+			cgh.parallel_for<class precalcBurstbqo>(cl::sycl::range<2>{numLinesFrame, 40}, [=](cl::sycl::item<2> tid)
+			{
+				int line = tid.get_id(0);
+				int col = tid.get_id(1);
+
+				int i = col + accessVideoPara[0].colourBurstStart;
+
+				unsigned short *blackLine = accessBlackLine.get_pointer();
+
+
+				//unsigned short *pointerInputData = accessInputData.get_pointer();
+
+				unsigned short *temp;
+
+				if ((tid.get_id(0) % 2) == 0)//was == 0
+				{
+					temp = accessInputData.get_pointer();
+				}
+				else
+				{
+					temp = accessInputDataTwo.get_pointer();
+				}
+
+
+
+				unsigned short *pointerInputData = temp;
+
+				int fullLineNum = (line / 2) + accessFirstLineNum[0];
+
+
+				const unsigned short *in0, *in1, *in2, *in3, *in4;
+				//in0 =                                                                 pointerInputData +  (fullLineNum      * accessVideoPara[0].fieldWidth);
+				in1 = (fullLineNum - 1) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 1) * accessVideoPara[0].fieldWidth));
+				in2 = (fullLineNum + 1) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 1) * accessVideoPara[0].fieldWidth));
+				//in3 = (fullLineNum - 2) <  0                           ? blackLine : (pointerInputData + ((fullLineNum - 2) * accessVideoPara[0].fieldWidth));
+				//in4 = (fullLineNum + 2) >= videoParameters.fieldHeight ? blackLine : (pointerInputData + ((fullLineNum + 2) * accessVideoPara[0].fieldWidth));
+
+				//accessbp[line][col] = ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessSine[i];
+				//accessbq = ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessCosine[i];
+				//accessbpo = ((in2[i] - in1[i]) / 2.0) * accessSine[i];
+				accessbqo[line][col] = ((in2[i] - in1[i]) / 2.0) * accessCosine[i];
+			});
+		});
+
+
+*/
+
 
 
 		myQueue.submit([&](cl::sycl::handler& cgh)
@@ -320,6 +553,11 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
 
 			auto accessBlackLine = bufBlackLine.get_access<cl::sycl::access::mode::read>(cgh);
+
+			//auto accessbp = bufBurstPrecalcbp.get_access<cl::sycl::access::mode::read>(cgh);
+			//auto accessbq = bufBurstPrecalcbq.get_access<cl::sycl::access::mode::read>(cgh);
+			//auto accessbpo = bufBurstPrecalcbpo.get_access<cl::sycl::access::mode::read>(cgh);
+			//auto accessbqo = bufBurstPrecalcbqo.get_access<cl::sycl::access::mode::read>(cgh);
 
 
 			cgh.parallel_for<class detectBursts>(cl::sycl::range<1>{numLinesFrame}, [=](cl::sycl::item<1> tid)
@@ -386,6 +624,8 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 				for (unsigned int i = accessVideoPara[0].colourBurstStart; i < accessVideoPara[0].colourBurstEnd; i++) {
 				
+				//for (int i = 0; i < 40; i++){
+
 				//const double rad = 2 * 3.14159265358979323846264338327950288 * i * videoParameters.fsc / videoParameters.sampleRate;
 				//double sine = cl::sycl::sin(rad);
 				//double cosine = cl::sycl::cos(rad);

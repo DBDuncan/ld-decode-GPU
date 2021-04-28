@@ -89,6 +89,11 @@ private:
 	cl::sycl::buffer<double> bufSine{cl::sycl::range<1>(1135)};
 	cl::sycl::buffer<double> bufCosine{cl::sycl::range<1>(1135)};
 
+	//cl::sycl::buffer<double, 2> bufBurstPrecalcbp{cl::sycl::range<2>(576, 40)};
+	//cl::sycl::buffer<double, 2> bufBurstPrecalcbq{cl::sycl::range<2>(576, 40)};
+	//cl::sycl::buffer<double, 2> bufBurstPrecalcbpo{cl::sycl::range<2>(576, 40)};
+	//cl::sycl::buffer<double, 2> bufBurstPrecalcbqo{cl::sycl::range<2>(576, 40)};
+
 	
 
 };
