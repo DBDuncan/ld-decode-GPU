@@ -647,15 +647,15 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 
 
-				accessM[0][col][line] =  accessInInfo[line].in0[col] * accessSine[col];
-				accessM[2][col][line] =  accessInInfo[line].in1[col] * accessSine[col] - accessInInfo[line].in2[col] * accessSine[col];
-				accessM[1][col][line] = -accessInInfo[line].in3[col] * accessSine[col] - accessInInfo[line].in4[col] * accessSine[col];
-				accessM[3][col][line] = -accessInInfo[line].in5[col] * accessSine[col] + accessInInfo[line].in6[col] * accessSine[col];
+				accessM[0][line][col] =  accessInInfo[line].in0[col] * accessSine[col];
+				accessM[2][line][col] =  accessInInfo[line].in1[col] * accessSine[col] - accessInInfo[line].in2[col] * accessSine[col];
+				accessM[1][line][col] = -accessInInfo[line].in3[col] * accessSine[col] - accessInInfo[line].in4[col] * accessSine[col];
+				accessM[3][line][col] = -accessInInfo[line].in5[col] * accessSine[col] + accessInInfo[line].in6[col] * accessSine[col];
 
-				accessN[0][col][line] =  accessInInfo[line].in0[col] * accessCosine[col];
-				accessN[2][col][line] =  accessInInfo[line].in1[col] * accessCosine[col] - accessInInfo[line].in2[col] * accessCosine[col];
-				accessN[1][col][line] = -accessInInfo[line].in3[col] * accessCosine[col] - accessInInfo[line].in4[col] * accessCosine[col];
-				accessN[3][col][line] = -accessInInfo[line].in5[col] * accessCosine[col] + accessInInfo[line].in6[col] * accessCosine[col];
+				accessN[0][line][col] =  accessInInfo[line].in0[col] * accessCosine[col];
+				accessN[2][line][col] =  accessInInfo[line].in1[col] * accessCosine[col] - accessInInfo[line].in2[col] * accessCosine[col];
+				accessN[1][line][col] = -accessInInfo[line].in3[col] * accessCosine[col] - accessInInfo[line].in4[col] * accessCosine[col];
+				accessN[3][line][col] = -accessInInfo[line].in5[col] * accessCosine[col] + accessInInfo[line].in6[col] * accessCosine[col];
 
 			});
 
@@ -745,19 +745,19 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				int l = i - b;
 				int r = i + b;
 
-				PY += (accessM[0][r][lineNum] + accessM[0][l][lineNum]) * accessYfilt[b][0] + (accessM[1][r][lineNum] + accessM[1][l][lineNum]) * accessYfilt[b][1];
+				PY += (accessM[0][lineNum][r] + accessM[0][lineNum][l]) * accessYfilt[b][0] + (accessM[1][lineNum][r] + accessM[1][lineNum][l]) * accessYfilt[b][1];
 
-				QY += (accessN[0][r][lineNum] + accessN[0][l][lineNum]) * accessYfilt[b][0] + (accessN[1][r][lineNum] + accessN[1][l][lineNum]) * accessYfilt[b][1];
-
-
+				QY += (accessN[0][lineNum][r] + accessN[0][lineNum][l]) * accessYfilt[b][0] + (accessN[1][lineNum][r] + accessN[1][lineNum][l]) * accessYfilt[b][1];
 
 
 
 
 
 
-				PU += (accessM[0][r][lineNum] + accessM[0][l][lineNum]) * accessCfilt[b][0] + (accessM[1][r][lineNum] + accessM[1][l][lineNum]) * accessCfilt[b][1]
-					+ (accessN[2][r][lineNum] + accessN[2][l][lineNum]) * accessCfilt[b][2] + (accessN[3][r][lineNum] + accessN[3][l][lineNum]) * accessCfilt[b][3];
+
+
+				PU += (accessM[0][lineNum][r] + accessM[0][lineNum][l]) * accessCfilt[b][0] + (accessM[1][lineNum][r] + accessM[1][lineNum][l]) * accessCfilt[b][1]
+					+ (accessN[2][lineNum][r] + accessN[2][lineNum][l]) * accessCfilt[b][2] + (accessN[3][lineNum][r] + accessN[3][lineNum][l]) * accessCfilt[b][3];
 
 
 
@@ -766,14 +766,14 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				//testValue = i;
 
 
-				QU += (accessN[0][r][lineNum] + accessN[0][l][lineNum]) * accessCfilt[b][0] + (accessN[1][r][lineNum] + accessN[1][l][lineNum]) * accessCfilt[b][1]
-					- (accessM[2][r][lineNum] + accessM[2][l][lineNum]) * accessCfilt[b][2] - (accessM[3][r][lineNum] + accessM[3][l][lineNum]) * accessCfilt[b][3];
+				QU += (accessN[0][lineNum][r] + accessN[0][lineNum][l]) * accessCfilt[b][0] + (accessN[1][lineNum][r] + accessN[1][lineNum][l]) * accessCfilt[b][1]
+					- (accessM[2][lineNum][r] + accessM[2][lineNum][l]) * accessCfilt[b][2] - (accessM[3][lineNum][r] + accessM[3][lineNum][l]) * accessCfilt[b][3];
                  
-				PV += (accessM[0][r][lineNum] + accessM[0][l][lineNum]) * accessCfilt[b][0] + (accessM[1][r][lineNum] + accessM[1][l][lineNum]) * accessCfilt[b][1]
-					- (accessN[2][r][lineNum] + accessN[2][l][lineNum]) * accessCfilt[b][2] - (accessN[3][r][lineNum] + accessN[3][l][lineNum]) * accessCfilt[b][3];
+				PV += (accessM[0][lineNum][r] + accessM[0][lineNum][l]) * accessCfilt[b][0] + (accessM[1][lineNum][r] + accessM[1][lineNum][l]) * accessCfilt[b][1]
+					- (accessN[2][lineNum][r] + accessN[2][lineNum][l]) * accessCfilt[b][2] - (accessN[3][lineNum][r] + accessN[3][lineNum][l]) * accessCfilt[b][3];
 
-				QV += (accessN[0][r][lineNum] + accessN[0][l][lineNum]) * accessCfilt[b][0] + (accessN[1][r][lineNum] + accessN[1][l][lineNum]) * accessCfilt[b][1]
-					+ (accessM[2][r][lineNum] + accessM[2][l][lineNum]) * accessCfilt[b][2] + (accessM[3][r][lineNum] + accessM[3][l][lineNum]) * accessCfilt[b][3];
+				QV += (accessN[0][lineNum][r] + accessN[0][lineNum][l]) * accessCfilt[b][0] + (accessN[1][lineNum][r] + accessN[1][lineNum][l]) * accessCfilt[b][1]
+					+ (accessM[2][lineNum][r] + accessM[2][lineNum][l]) * accessCfilt[b][2] + (accessM[3][lineNum][r] + accessM[3][lineNum][l]) * accessCfilt[b][3];
 
 				//test code here
 /*

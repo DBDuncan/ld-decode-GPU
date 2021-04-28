@@ -81,8 +81,8 @@ private:
 
 	cl::sycl::buffer<InInfo> bufInInfo{cl::sycl::range<1>(576)};
 
-	cl::sycl::buffer<double, 3> bufM{cl::sycl::range<3>(4, 1135, 576)};
-	cl::sycl::buffer<double, 3> bufN{cl::sycl::range<3>(4, 1135, 576)};
+	cl::sycl::buffer<double, 3> bufM{cl::sycl::range<3>(4, 576, 1135)};
+	cl::sycl::buffer<double, 3> bufN{cl::sycl::range<3>(4, 576, 1135)};
 
 	cl::sycl::buffer<unsigned short> bufBlackLine{cl::sycl::range<1>(1135)};
 
