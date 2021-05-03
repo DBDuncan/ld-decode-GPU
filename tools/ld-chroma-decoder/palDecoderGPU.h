@@ -13,9 +13,8 @@
 
 #include <CL/sycl.hpp>
 
-
+//these two structs are used to store data about each line on the GPU
 struct LineInfo {
-	//explicit LineInfo(qint32 number);
 
 	qint32 number;
 	double bp, bq;
@@ -36,22 +35,6 @@ struct InInfo {
 };
 
 
-	//double m_sine[];
-	//double m_cosine[];
-
-/*
-	void setupWaves(double sine[], double cosine[])
-	{
-		m_sine = &sine;
-		m_cosine = &cosine;
-
-
-	}
-*/
-
-
-
-//void decodeFieldGPU(const SourceField &inputField, const double *chromaData, double chromaGain, RGBFrame &outputFrame);
 
 class DecodePAL {
 
@@ -60,41 +43,34 @@ public:
 
 	~DecodePAL();
 
-
-	//static void setupSine(double sine[], double cosine[]);
-
-
-
 void decodeFieldGPU(const SourceField &inputField, const SourceField &inputFieldTwo, const double *chromaData, double chromaGain, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, double sine[], double cosine[], double cfilt[][4], double yfilt[][2]);
 
 
 private:
 
-
-	//static double m_sine[];
-	//static double m_cosine[];
-
 	cl::sycl::queue myQueue;
 
-
+	//buffer storing info about the lien
 	cl::sycl::buffer<LineInfo> bufLineInfo{cl::sycl::range<1>(576)};
-
+	//buffer storing pointers to areas around a line
 	cl::sycl::buffer<InInfo> bufInInfo{cl::sycl::range<1>(576)};
 
+	//M and N buffers used to store chroma data
 	cl::sycl::buffer<double, 3> bufM{cl::sycl::range<3>(4, 576, 1135)};
 	cl::sycl::buffer<double, 3> bufN{cl::sycl::range<3>(4, 576, 1135)};
 
+	//buffer to represent a black line
 	cl::sycl::buffer<unsigned short> bufBlackLine{cl::sycl::range<1>(1135)};
 
+	//buffers to store sine and cosine data
 	cl::sycl::buffer<double> bufSine{cl::sycl::range<1>(1135)};
 	cl::sycl::buffer<double> bufCosine{cl::sycl::range<1>(1135)};
 
+	//buffers that were used for test in parelizing the analysing of the colour burst of each line
 	//cl::sycl::buffer<double, 2> bufBurstPrecalcbp{cl::sycl::range<2>(576, 40)};
 	//cl::sycl::buffer<double, 2> bufBurstPrecalcbq{cl::sycl::range<2>(576, 40)};
 	//cl::sycl::buffer<double, 2> bufBurstPrecalcbpo{cl::sycl::range<2>(576, 40)};
 	//cl::sycl::buffer<double, 2> bufBurstPrecalcbqo{cl::sycl::range<2>(576, 40)};
-
-	
 
 };
 

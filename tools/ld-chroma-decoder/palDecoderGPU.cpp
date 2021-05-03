@@ -9,8 +9,6 @@
 #include <vector>
 
 
-//#include <CL/cl.hpp>
-
 #include <CL/sycl.hpp>
 
 
@@ -19,20 +17,9 @@
 
 #include "palDecoderGPU.h"
 
-//a change
-
 
 DecodePAL::DecodePAL(double sine[], double cosine[])
 {
-
-	
-	//cl::sycl::buffer<double> bufSin{sine, cl::sycl::range<1>(1135)};
-	//cl::sycl::buffer<double> bufCosin{cosine, cl::sycl::range<1>(1135)};
-
-	//bufSine{sine, cl::sycl::range<1>(1135)};
-
-	//bufCosine{cosine, cl::sycl::range<1>(1135)};
-
 	
 	cl::sycl::buffer<double> bufSineTemp(sine, cl::sycl::range<1>(1135));
 	cl::sycl::buffer<double> bufCosineTemp(cosine, cl::sycl::range<1>(1135));
@@ -48,23 +35,15 @@ DecodePAL::DecodePAL(double sine[], double cosine[])
 		auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::discard_write>(cgh);
 
 
+		//this kernel loads the sine and cosine data when DecodePAL object is constructed
+		//so that it does not need to be loaded for decoding every frame
 		cgh.parallel_for<class initData>(cl::sycl::range<1>{1135}, [=](cl::sycl::item<1> tid)
 		{
 			int i = tid.get_id(0);
 
-
 			accessSine[i] = accessSineTemp[i];
 			accessCosine[i] = accessCosineTemp[i];
-
-
-
 		});
-
-
-
-
-
-
 	});
 
 }
@@ -72,90 +51,9 @@ DecodePAL::DecodePAL(double sine[], double cosine[])
 DecodePAL::~DecodePAL()
 {}
 
-/*
-void DecodePAL::setupSine(double sine[], double cosine[])
-{
-
-	m_sine = sine;
-
-	m_cosine = cosine;
-
-
-
-}
-*/
-
-
-
-
-
-__host__ __device__
-double opti(double num1, double num2)
-{
-
-	#ifdef SYCL_DEVICE_ONLY
-		#ifdef HIPSYCL_PLATFORM_CUDA
-		__syncthreads();
-		return max(num1, num2);
-		#endif
-	#endif
-	return 0;	
-}
-
-/*
-void decodeFieldGPU(const SourceField &inputField, const double *chromaData, double chromaGain, RGBFrame &outputFrame)
-{
-
-	int a;
-
-}
-*/
-
-/*
-	struct LineInfo {
-		//explicit LineInfo(qint32 number);
-
-		qint32 number;
-		double bp, bq;
-		double Vsw;
-	};
-*/
-
-
-/*
-struct InInfo {
-
-	const unsigned short* in0;
-	const unsigned short* in1;
-	const unsigned short* in2;
-	const unsigned short* in3;
-	const unsigned short* in4;
-	const unsigned short* in5;
-	const unsigned short* in6;
-
-};
-
-
-struct FilterComponents {
-
-	double pu;
-	double qu;
-	double pv;
-	double qv;
-	double py;
-	double qy;
-
-
-
-};
-*/
-
 
 void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField &inputFieldTwo, const double *chromaData, double chromaGain, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, double sine[], double cosine[], double cfilt[][4], double yfilt[][2])
 {
-	//work in progress
-
-	//std::cout << "Line Width: " <<videoParameters.activeVideoEnd - videoParameters.activeVideoStart << std::endl;
 
 	const qint32 firstLine = inputField.getFirstActiveLine(videoParameters);
 	const qint32 lastLine = inputField.getLastActiveLine(videoParameters);
@@ -163,52 +61,21 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 	const int offset = inputField.getOffset();
 
-	//std::cout << offset << std::endl;
-
 	const qint32 firstLineFieldTwo = inputFieldTwo.getFirstActiveLine(videoParameters);
 
 	const int numOfLines = lastLine - firstLine;
 
 	int arraySize = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
 
-	//std::vector<int> lines(lastLine - firstLine);
-
 	int numLinesField = lastLine - firstLine;
 
 	//576
 	const size_t numLinesFrame = numLinesField * 2;
 
-
-	//std::cout << "numLinesFrame" << numLinesFrame << std::endl;
-
-
-	//std::iota(lines.begin(), lines.end(), firstLine);
-
 	int colourBurstLength = videoParameters.colourBurstEnd - videoParameters.colourBurstStart;
-
-	//array for test outputs
-	//std::vector<double> c(100);
-
-
-	//std::cout << numLinesFrame << " : " << numLinesFrame << std::endl;
-
-	//std::cout << "width: " << lastLine - firstLine << std::endl;
-
-	//std::cout << "colour burst length: " << videoParameters.colourBurstEnd - videoParameters.colourBurstStart << std::endl;
-
 
 	//bracketed to make sure buffers deconstruct when calcuation is done and transfer data back.
 	{
-
-		//queue which is used to execure kernel jobs
-		//cl::sycl::queue myQueue;
-
-		//buffer for accessing test data
-		//cl::sycl::buffer<double> buff_c(c.data(), c.size());
-
-		//buffer for sine and cosine. need to look into calculating data on GPU
-		//cl::sycl::buffer<double> bufSine(sine, cl::sycl::range<1>(1135));
-		//cl::sycl::buffer<double> bufCosine(cosine, cl::sycl::range<1>(1135));
 
 		//buffer for input dataa
 		const qint32 frameHeightTwo = (videoParameters.fieldHeight * 2) - 1;
@@ -220,55 +87,13 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 		//buffer containing offset of first line (prob 22) also prob needs to be removed
 		cl::sycl::buffer<int> bufFirstLineNum(&firstLine, cl::sycl::range<1>(1));
 
-		//buffer for lineinfo structs
-		//cl::sycl::buffer<LineInfo> bufLineInfo(lineInfos.data(), cl::sycl::range<1>(lastLine - firstLine));
-		//cl::sycl::buffer<LineInfo> bufLineInfo{cl::sycl::range<1>(numLinesFrame)};//was lastLine - firstLine
-
-
-		//test buffer
-		//cl::sycl::buffer<LineInfo> bufTest{cl::sycl::range<1>(200)};
-
-		//buffer of structs containing pointers.
-		//cl::sycl::buffer<InInfo> bufInInfo{cl::sycl::range<1>(numLinesFrame)};
-
-		//first two nums are set, last is of how many lines.
-		//cl::sycl::buffer<double, 3> bufM{cl::sycl::range<3>(4, 1135, numLinesFrame)};
-		//cl::sycl::buffer<double, 3> bufN{cl::sycl::range<3>(4, 1135, numLinesFrame)};
-
-
-		//accessor of filter component structs to help calculate colour of each pixel.
-		//cl::sycl::buffer<FilterComponents, 2> bufFilterComponents{cl::sycl::range<2>(numLinesFrame, 1135)};// was 1135 288
-		
-		//buffer of c and y filt. maybe can be calculated on GPU?
-		//cl::sycl::buffer<double, 2> bufCfilt(*cfilt, cl::sycl::range<2>(7 + 1, 4));
-		//cl::sycl::buffer<double, 2> bufYfilt(*yfilt, cl::sycl::range<2>(7 + 1, 2));
-
-
 		//output buffer
 		int frameHeight = (videoParameters.fieldHeight * 2) - 1;
 		cl::sycl::buffer<unsigned short> bufOutput{outputFrame.data(), cl::sycl::range<1>(videoParameters.fieldWidth * frameHeight * 3)};
 
-
-		//test PU buffer. needs to be removed.
-		//cl::sycl::buffer<double, 2> bufPU{cl::sycl::range<2>(288, 1135)};//was 1135 288
-
-
 		cl::sycl::buffer<LdDecodeMetaData::VideoParameters> bufVideoPara(&videoParameters, cl::sycl::range<1>(1));
 
-
-		//cl::sycl::buffer<unsigned short> bufBlackLine{cl::sycl::range<1>(1135)};
-
-		//keep for easy output of GPU device on system
-		//std::cout << "Running on "
-		//<< myQueue.get_device().get_info<cl::sycl::info::device::name>()
-		//<< "\n";
-
-
-	//std::cout << "max work group size: " << myQueue.get_device().get_info<cl::sycl::info::device::max_work_group_size>();
-
-
-		//std::cout << "colour burst length: " << videoParameters.colourBurstEnd - videoParameters.colourBurstStart << std::endl;
-
+//the following kernels were used to test weather it would be faster to parelize analysing the colour burst of each line.
 /*
 		myQueue.submit([&](cl::sycl::handler& cgh)
 		{
@@ -521,35 +346,6 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 			//line info accessor of structs of line info
 			auto accessLineInfo = bufLineInfo.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
-
-			//test accessor
-			//auto accessTest = cl::sycl::accessor<LineInfo, 1, cl::sycl::access::mode::read_write, cl::sycl::access::target::local, cl::sycl::access::placeholder::false_t>(cl::sycl::range<1>(lastLine - firstLine), cgh);
-
-			//buffer test
-			//auto accessBufTest = bufTest.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
-
-			//accessor of In pointers.
-			///auto accessInInfo = bufInInfo.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
-
-
-			//M and N array accessors
-			///auto accessM = bufM.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
-			///auto accessN = bufN.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
-
-			//accessor of filter component structs to store colour components
-			//auto accessFilterComponents = bufFilterComponents.get_access<cl::sycl::access::mode::read_write>(cgh);
-
-			//accessor of cfilt and yfilt. maybe better to generate on GPU?
-			//auto accessCfilt = bufCfilt.get_access<cl::sycl::access::mode::read>(cgh);
-			//auto accessYfilt = bufYfilt.get_access<cl::sycl::access::mode::read>(cgh); 
-
-			//accessor of output
-			//auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::write>(cgh);//changed from read_write
-
-			//test accessor of PU
-			//auto accessPU = bufPU.get_access<cl::sycl::access::mode::read_write>(cgh);
-
-
 			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
 
 			auto accessBlackLine = bufBlackLine.get_access<cl::sycl::access::mode::read>(cgh);
@@ -565,24 +361,7 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 				int lineNum = tid.get_id(0);
 
-
-
-				
-
-
-
-
-				//not used at all
-				//accessLineInfo[lineNum].number = (lineNum / 2) + accessFirstLineNum[0];//lineNum + accessFirstLineNum[0];
-
-
-				//static constexpr quint16 blackLine[1135] = {0};
-
-
 				unsigned short *blackLine = accessBlackLine.get_pointer();
-
-
-				//unsigned short *pointerInputData = accessInputData.get_pointer();
 
 				unsigned short *temp;
 
@@ -620,26 +399,12 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 				double bp = 0.0, bq = 0.0, bpo = 0.0, bqo = 0.0;
 
-				//double pi = 3.14159265359;
-
 				for (unsigned int i = accessVideoPara[0].colourBurstStart; i < accessVideoPara[0].colourBurstEnd; i++) {
-				
-				//for (int i = 0; i < 40; i++){
 
-				//const double rad = 2 * 3.14159265358979323846264338327950288 * i * videoParameters.fsc / videoParameters.sampleRate;
-				//double sine = cl::sycl::sin(rad);
-				//double cosine = cl::sycl::cos(rad);
-
-
-
-				bp += ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessSine[i];
-				bq += ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessCosine[i];
-				bpo += ((in2[i] - in1[i]) / 2.0) * accessSine[i];
-				bqo += ((in2[i] - in1[i]) / 2.0) * accessCosine[i];
-				
-				//accessSine[i] = sine;
-				//accessCosine[i] = cosine;
-
+					bp += ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessSine[i];
+					bq += ((in0[i] - ((in3[i] + in4[i]) / 2.0)) / 2.0) * accessCosine[i];
+					bpo += ((in2[i] - in1[i]) / 2.0) * accessSine[i];
+					bqo += ((in2[i] - in1[i]) / 2.0) * accessCosine[i];
 				}
 
 
@@ -650,19 +415,12 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				bpo /= colourBurstLength;
 				bqo /= colourBurstLength;
 
-
-
-
-
 				accessLineInfo[lineNum].Vsw = -1;
-
 
 				if ((((bp - bpo) * (bp - bpo) + (bq - bqo) * (bq - bqo)) < (bp * bp + bq * bq) * 2))
 				{
 					accessLineInfo[lineNum].Vsw = 1;
 				}
-
-
 
 				// Average the burst phase to get -U (reference) phase out -- burst
 				// phase is (-U +/-V). bp and bq will be of the order of 1000.
@@ -789,28 +547,10 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				accessInInfo[lineNum].in5 = in5Two;
 				accessInInfo[lineNum].in6 = in6Two;
 
-
-
-
-
-
-
-
-
-
 			});
-
-
 		});
 
-
-			//this cuda function works here!!!!!
-			//cudaDeviceSynchronize();
-
-			const size_t lineWidthCustom = videoParameters.activeVideoEnd - videoParameters.activeVideoStart + 1 + 7;
-
-			//std::cout << "numLinesFrame: " << numLinesFrame << std::endl;
-
+		const size_t lineWidthCustom = videoParameters.activeVideoEnd - videoParameters.activeVideoStart + 1 + 7;
 
 		myQueue.submit([&](cl::sycl::handler& cgh)
 		{
@@ -822,30 +562,18 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 			auto accessM = bufM.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 			auto accessN = bufN.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
 
-			//accessor of filter component structs to store colour components
-			//auto accessFilterComponents = bufFilterComponents.get_access<cl::sycl::access::mode::read_write>(cgh);
-
-			//accessor of cfilt and yfilt. maybe better to generate on GPU?
-			//auto accessCfilt = bufCfilt.get_access<cl::sycl::access::mode::read>(cgh);
-			//auto accessYfilt = bufYfilt.get_access<cl::sycl::access::mode::read>(cgh); 
-
 			//accessor of output
 			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::write>(cgh);//changed from read_write
-
 			
 			//accessor of input data
 			auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
 			auto accessInputDataTwo = bufInputDataTwo.get_access<cl::sycl::access::mode::read>(cgh);
 
-
-
 			//accessor of sine and cosine data. Need to look into calculating sine and cosine when needed on GPU
 			auto accessSine = bufSine.get_access<cl::sycl::access::mode::read>(cgh);
 			auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::read>(cgh);
 
-
 			auto accessLineInfo = bufLineInfo.get_access<cl::sycl::access::mode::read>(cgh);
-
 
 			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
 
@@ -859,34 +587,6 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				//plus active video start for offset
 				int col = tid.get_id(1) + accessVideoPara[0].activeVideoStart - 7;
 
-				//line = 576;
-
-				//if (line > 575)
-				//line = 3;
-				//accessM[0][col][line] = 55;
-				//unsigned short num = accessInInfo[line].in0[col];
-				//accessM[0][col][line] =  accessInInfo[line].in0[col];
-
-
-				//accessM[0][col][line] = line + 1;
-				//unsigned short num = accessSine[col];
-				//unsigned short numTwo = accessInInfo[line].in0[col];		
-				//unsigned short numThree = num * numTwo;
-				//accessM[0][col][line] = numTwo;
-
-
-				//accessM[0][col][line] = num * numTwo;
-
-
-
-
-				//const double rad = 2 * 3.14159265358979323846264338327950288 * col * videoParameters.fsc / videoParameters.sampleRate;
-				//double sine = cl::sycl::sin(rad);
-				//double cosine = cl::sycl::cos(rad);
-
-
-
-
 				accessM[0][line][col] =  accessInInfo[line].in0[col] * accessSine[col];
 				accessM[2][line][col] =  accessInInfo[line].in1[col] * accessSine[col] - accessInInfo[line].in2[col] * accessSine[col];
 				accessM[1][line][col] = -accessInInfo[line].in3[col] * accessSine[col] - accessInInfo[line].in4[col] * accessSine[col];
@@ -896,27 +596,12 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				accessN[2][line][col] =  accessInInfo[line].in1[col] * accessCosine[col] - accessInInfo[line].in2[col] * accessCosine[col];
 				accessN[1][line][col] = -accessInInfo[line].in3[col] * accessCosine[col] - accessInInfo[line].in4[col] * accessCosine[col];
 				accessN[3][line][col] = -accessInInfo[line].in5[col] * accessCosine[col] + accessInInfo[line].in6[col] * accessCosine[col];
-
 			});
-
-
-
-
-
-
-
 
 			const size_t lineWidth = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
 
-
-			//std::cout << "Width of lines:::>>>> " << lineWidth << std::endl;
-			//std::cout << "Number of Lines:::>>>>" << lines.size() << std::endl;
-
-
 			cgh.parallel_for<class chromaFilter>(cl::sycl::range<2>{numLinesFrame, 1135}, [=](cl::sycl::item<2> tid)
 			{
-
-
 				double testValue = 0.0;
 				int i = tid.get_id(1) + accessVideoPara[0].activeVideoStart;
 				int lineNum = tid.get_id(0);
@@ -926,14 +611,6 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				double newPU;
 
 				int startTwo = 0;
-
-				//for (int i = videoParameters.activeVideoStart; i < videoParameters.activeVideoEnd; i++) {
-
-				//QU = 0.0, PV = 0.0, QV = 0.0, PY = 0.0, QY = 0.0;
-
-				//double PU[8];
-
-				//newPU = 0.0;
 
 				// Carry out 2D filtering. P and Q are the two arbitrary SINE & COS
 				// phases components. U filters for U, V for V, and Y for Y.
@@ -989,22 +666,8 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 				QY += (accessN[0][lineNum][r] + accessN[0][lineNum][l]) * accessYfilt[b][0] + (accessN[1][lineNum][r] + accessN[1][lineNum][l]) * accessYfilt[b][1];
 
-
-
-
-
-
-
-
 				PU += (accessM[0][lineNum][r] + accessM[0][lineNum][l]) * accessCfilt[b][0] + (accessM[1][lineNum][r] + accessM[1][lineNum][l]) * accessCfilt[b][1]
 					+ (accessN[2][lineNum][r] + accessN[2][lineNum][l]) * accessCfilt[b][2] + (accessN[3][lineNum][r] + accessN[3][lineNum][l]) * accessCfilt[b][3];
-
-
-
-				//testValue = newPU;
-
-				//testValue = i;
-
 
 				QU += (accessN[0][lineNum][r] + accessN[0][lineNum][l]) * accessCfilt[b][0] + (accessN[1][lineNum][r] + accessN[1][lineNum][l]) * accessCfilt[b][1]
 					- (accessM[2][lineNum][r] + accessM[2][lineNum][l]) * accessCfilt[b][2] - (accessM[3][lineNum][r] + accessM[3][lineNum][l]) * accessCfilt[b][3];
@@ -1054,46 +717,12 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				}
 
 
-				//accessFilterComponents[lineNum][i].pu = PU;//PU;//testValue;//newPU;
-				//accessFilterComponents[lineNum][i].qu = QU;
-				//accessFilterComponents[lineNum][i].pv = PV;
-				//accessFilterComponents[lineNum][i].qv = QV;
-				//accessFilterComponents[lineNum][i].py = PY;
-				//accessFilterComponents[lineNum][i].qy = QY;
-
 
 
 
 			
 
-			//});
-
-/*
-			myQueue.submit([&](cl::sycl::handler& cgh)
-			{
-			auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
-
-			auto accessVideoPara = bufVideoPara.get_access<cl::sycl::access::mode::read>(cgh);
-
-			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::read_write>(cgh);
-
-			auto accessFilterComponents = bufFilterComponents.get_access<cl::sycl::access::mode::read_write>(cgh);
-
-			auto accessSine = bufSine.get_access<cl::sycl::access::mode::read>(cgh);
-			auto accessCosine = bufCosine.get_access<cl::sycl::access::mode::read>(cgh);
-
-			auto accessInInfo = bufInInfo.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
-
-			auto accessLineInfo = bufLineInfo.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
-
-
-			auto access_c = buff_c.get_access<cl::sycl::access::mode::write>(cgh);
-
-			const size_t lineWidth = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
-*/
-
-			//cgh.parallel_for<class decodeRGB>(cl::sycl::range<2>{numLinesFrame, lineWidth}, [=](cl::sycl::item<2> tid)
-			//{
+			
 
 				int lineNumber = (int)tid.get_id(0) / 2;
 				lineNum = lineNumber;
@@ -1105,10 +734,7 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 				int lineNumFull = tid.get_id(0);
 
-				//unsigned short *tempTwo = accessInputData.get_pointer();
-
 				unsigned short *inputTemp;
-				//unsigned short *temp = accessOutput.get_pointer();	
 
 				int addedNum = 0;
 
@@ -1119,16 +745,11 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				else
 				{
 					inputTemp = accessInputDataTwo.get_pointer();
-					//realLineNum = lineNumber + firstLineFieldTwo;
-					//temp = temp + 1; 
-					//realLineNum += 1;
 					addedNum = 1;
 					realLineNum = lineNumber + firstLineFieldTwo;
 				}
 
 				unsigned short *tempTwo = inputTemp;
-
-
 
 				unsigned short *temp = accessOutput.get_pointer();
 
@@ -1147,15 +768,7 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				// burst-based correction applied.
 				const double scaledSaturation = 2.0 * scaledContrast * chromaGain;
 
-
 				double rY;
-
-
-				//const double rad = 2 * 3.14159265358979323846264338327950288 * i * videoParameters.fsc / videoParameters.sampleRate;
-				//double sine = cl::sycl::sin(rad);
-				//double cosine = cl::sycl::cos(rad);
-
-
 
 				//if statement will need to be around the line bellow if prefiltered chroma is being used, but prefiltered chroma is not supported at all at the moment
 				rY = comp[i] - ((PY * accessSine[i] + QY * accessCosine[i]) * 2.0);
@@ -1182,6 +795,7 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				ptr[pp + 1] = (unsigned short)G;
 				ptr[pp + 2] = (unsigned short)B;
 
+//code here is used for testing purposes to get data about a spercific pixel
 /*
 				//extracting data from a spercific pixel for testing purposes
 				if (3 == tid.get_id(0))//was lineNumber == 0
@@ -1243,43 +857,9 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 
 
 			});
-
-			//little test kernel. will be removed later.
-			/*
-			cgh.parallel_for<class test>(cl::sycl::range<1>{1}, [=](cl::sycl::item<1> tid)
-			{
-
-				//access_c[0] = accessM[0][1134][0];
-				//access_c[4] = accessFilterComponents[0][200].pu;
-				//num, col, line
-				//access_c[5] = accessN[0][500][150];
-
-				//access_c[5] = accessYfilt[5][1];
-
-
-				//access_c[0] = accessOutput[2046 + (((22 * 2) + inputField.getOffset()) * videoParameters.fieldWidth * 3)];
-
-				//item, col, line
-				//access_c[13] = accessM[0][500][1];
-				//access_c[14] = accessM[1][500][1];
-				//access_c[15] = accessM[2][500][1];
-				//access_c[16] = accessM[3][500][1];
-
-
-			});
-
-
-*/
-
-
-
 		});
-
-
-
-
 	}
-
+	//end of scope, buffers are deconstructed here and transfer their data back to the host as appropriate
 
 	const size_t lineWidth = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
 

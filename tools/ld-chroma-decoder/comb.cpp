@@ -120,18 +120,19 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
     assert(configurationSet);
     assert((outputFrames.size() * 2) == (endIndex - startIndex));
 	
-	//std::cout << "big test" << std::endl;
+	
 
-
+	//comment out code to run CPU decoder
+/*
     // Buffers for the next, current and previous frame.
     // Because we only need three of these, we allocate them upfront then
     // rotate the pointers below.
-    //QScopedPointer<FrameBuffer> nextFrameBuffer, currentFrameBuffer, previousFrameBuffer;
-    //nextFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
-    //currentFrameBuffer.reset(new FrameBuffer(videoParameters, configuration)); //for GPU only need this
-    //previousFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
+    QScopedPointer<FrameBuffer> nextFrameBuffer, currentFrameBuffer, previousFrameBuffer;
+    nextFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
+    currentFrameBuffer.reset(new FrameBuffer(videoParameters, configuration)); //for GPU only need this
+    previousFrameBuffer.reset(new FrameBuffer(videoParameters, configuration));
 
-/*
+
     // Decode each pair of fields into a frame.
     // To support 3D operation, where we need to see three input frames at a time,
     // each iteration of the loop loads and 1D/2D-filters frame N + 1, then
@@ -201,6 +202,7 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
 
 
         // Apply noise reduction
+		//note that noise reduction was not implimented in the GPU decoder
         //currentFrameBuffer->doYNR();
         //currentFrameBuffer->doCNR();
 
@@ -212,8 +214,6 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
             currentFrameBuffer->overlayMap(*previousFrameBuffer, *nextFrameBuffer, outputFrames[frameIndex]);
         }
 
-		//std::cout << "a frame " << std::endl;
-
 
 		//linenumber then hoz
 		//std::cout << "----------------------------- CPU DATA -----------------------" << std::endl;
@@ -224,14 +224,9 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
 		//std::cout << "current YIQ Q: " << currentFrameBuffer->yiqBuffer[200][200].q << std::endl;
 
 
-
-		// was +2 and +3
-		//decodeFrameGPU(inputFields[fieldIndex], inputFields[fieldIndex + 1], outputFrames[frameIndex], videoParameters, currentFrameBuffer->rawbuffer, configuration.yNRLevel, currentFrameBuffer->irescale, configuration.chromaGain, configuration.whitePoint75);
-
-
     }
-
 */
+
 
 
 	DecodeNTSC gpuDecoder;
@@ -242,7 +237,6 @@ void Comb::decodeFrames(const QVector<SourceField> &inputFields, qint32 startInd
 
 
         if (fieldIndex < startIndex) {
-            //std::cout << "look behind frame" << std::endl;
             // This is a look-behind frame; no further decoding needed.
             continue;
         }
@@ -711,7 +705,6 @@ void Comb::FrameBuffer::doYNR()
 {
     if (configuration.yNRLevel == 0)
 	{
-		std::cout << "yNR Level is zero" << std::endl;
 		return;
 	}
 

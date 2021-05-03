@@ -21,7 +21,7 @@
 #include "deemp.h"
 
 
-
+//these two functions are used in kernels. They are automaticly converted to be able to run on the GPU
 inline qint32 getFieldID(qint32 lineNumber, int firstFieldPhaseID, int secondFieldPhaseID)
 {
     bool isFirstField = ((lineNumber % 2) == 0);
@@ -41,6 +41,8 @@ inline bool getLinePhase(qint32 lineNumber, int firstFieldPhaseID, int secondFie
     return isEvenLine ? isPositivePhaseOnEvenLines : !isPositivePhaseOnEvenLines;
 }
 
+
+/*
 __host__ __device__
 void sync()
 {
@@ -51,7 +53,7 @@ void sync()
 	#endif
 
 }
-
+*/
 
 
 
@@ -67,41 +69,14 @@ DecodeNTSC::~DecodeNTSC()
 void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFieldTwo, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, double yNRLevel, double irescale, double chromaGain, bool whitePoint75)
 {
 
-
-
-	//int a = 1;
-
-	//std::cout << "call test" << std::endl;
-	std::vector<double> testData(100);
-
 	int frameHeight = ((videoParameters.fieldHeight * 2) - 1);
 
 	outputFrame.resize(videoParameters.fieldWidth * frameHeight * 3);
 
-
-	//std::cout << "Frame Height: " << frameHeight << std::endl;
-
 	{
-
-		//cl::sycl::queue myQueue;
-
-
-		//cl::sycl::buffer<double> bufTestOutput(testData.data(), testData.size());
-
-
-		//cl::sycl::buffer<unsigned short> bufInputData(rawbuffer.data(), rawbuffer.size());
 
 		cl::sycl::buffer<unsigned short> bufInputDataOne(inputFieldOne.data.data(), inputFieldOne.data.size());
 		cl::sycl::buffer<unsigned short> bufInputDataTwo(inputFieldTwo.data.data(), inputFieldTwo.data.size());
-
-
-
-		//cl::sycl::buffer<double, 2> bufClpBuffer1D{cl::sycl::range<2>(525, 910)};//was 525
-		//cl::sycl::buffer<double, 2> bufClpBuffer2D{cl::sycl::range<2>(525, 910)};
-
-		//cl::sycl::buffer<YIQ, 2> bufYIQ{cl::sycl::range<2>(525, 910)};
-
-
 		cl::sycl::buffer<unsigned short> bufOutput{outputFrame.data(), cl::sycl::range<1>(videoParameters.fieldWidth * frameHeight * 3)};
 
 		const size_t lines = videoParameters.lastActiveFrameLine - videoParameters.firstActiveFrameLine;
@@ -113,38 +88,14 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
         myQueue.submit([&](cl::sycl::handler& cgh)
 		{
 
-
-			//auto accessTestOutput = bufTestOutput.get_access<cl::sycl::access::mode::write>(cgh);
-	
-
-			//auto accessInputData = bufInputData.get_access<cl::sycl::access::mode::read>(cgh);
-
-
 			auto accessInputDataOne = bufInputDataOne.get_access<cl::sycl::access::mode::read>(cgh);
 			auto accessInputDataTwo = bufInputDataTwo.get_access<cl::sycl::access::mode::read>(cgh);
-
-
-
-			//auto accessClpBuffer1D = bufClpBuffer1D.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
-
 			auto accessClpBuffer2D = bufClpBuffer2D.get_access<cl::sycl::access::mode::discard_write>(cgh);
 
 
-			//auto accessYIQ = bufYIQ.get_access<cl::sycl::access::mode::discard_read_write>(cgh);
-
-
-			//auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::discard_read_write>(cgh);//change later to discard_write
-
-
-			//const size_t lines = videoParameters.lastActiveFrameLine - videoParameters.firstActiveFrameLine;
-
-			//const size_t width = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
-
-			//std::cout << "lines: " << lines << std::endl;
-
-
+//these are two function that were used to test weather performance would be improved by having two split1D functions
+//removing the need for an if statement
 /*
-
 			cgh.parallel_for<class split1D>(cl::sycl::range<2>{lines/2, width}, [=](cl::sycl::item<2> tid)
             {
 
@@ -245,14 +196,8 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 				int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
 				int col = tid.get_id(1) + videoParameters.activeVideoStart;
 
-
-				//int lineNumTwo = tid.get_id(0) + (videoParameters.firstActiveFrameLine / 2);
-
-				//int finalLineNum;
-
+				//pointer to access the correct field
 				unsigned short *temp;
-
-
 				
 				if ((tid.get_id(0) % 2) == 0)
 				{
@@ -265,13 +210,6 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 
 				}
 				
-
-
-				//temp = accessInputDataTwo.get_pointer();
-
-
-				//temp = accessInputData.get_pointer();
-
 				//dont forget divide by two here!!!
 				const unsigned short *line = temp + ((lineNum / 2) * videoParameters.fieldWidth);
 
@@ -279,10 +217,7 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 				double tc1 = (line[col] - ((line[col - 2] + line[col + 2]) / 2.0)) / 2.0;
 
 				accessClpBuffer2D[lineNum][col] = tc1;
-			
-
 			});
-
 		});
 
 
@@ -298,22 +233,18 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 				int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
 				int h = tid.get_id(1) + videoParameters.activeVideoStart;
 
-
-
-
 				double *temp = accessClpBuffer2D.get_pointer();
 
 				const double *previousLine = blackLine;
 				if (lineNum - 2 >= videoParameters.firstActiveFrameLine) 
 				{
-					//double *temp = accessClpBuffer1D.get_pointer();
-					previousLine = temp + ((lineNum - 2) * videoParameters.fieldWidth); //accessClpBuffer1D.pixel[lineNumber - 2];
+					previousLine = temp + ((lineNum - 2) * videoParameters.fieldWidth);
 				}
-				const double *currentLine = temp + (lineNum * videoParameters.fieldWidth);//accessClpBuffer.pixel[lineNumber];
+				const double *currentLine = temp + (lineNum * videoParameters.fieldWidth);
 				const double *nextLine = blackLine;
 				if (lineNum + 2 < videoParameters.lastActiveFrameLine) 
 				{
-					nextLine = temp + ((lineNum+ 2) * videoParameters.fieldWidth);//clpbuffer[0].pixel[lineNumber + 2];
+					nextLine = temp + ((lineNum+ 2) * videoParameters.fieldWidth);
 				}
 
 				double kp, kn;
@@ -367,7 +298,7 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 				tc1 += ((currentLine[h] - nextLine[h]) * kn * sc);
 				tc1 /= 4;
 
-				//clpbuffer[1].pixel[lineNumber][h] = tc1;
+				//save data to same buffer used to calcuate the data. saves needing another buffer.
 				accessClpBuffer2D[lineNum][h] = tc1;
 
 			});
@@ -378,9 +309,6 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 		{
 			auto accessOutput = bufOutput.get_access<cl::sycl::access::mode::discard_write>(cgh);
 			auto accessClpBuffer2D = bufClpBuffer2D.get_access<cl::sycl::access::mode::read>(cgh);
-
-
-
 			auto accessInputDataOne = bufInputDataOne.get_access<cl::sycl::access::mode::read>(cgh);
 			auto accessInputDataTwo = bufInputDataTwo.get_access<cl::sycl::access::mode::read>(cgh);
 
@@ -388,14 +316,12 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 			cgh.parallel_for<class splitIQ>(cl::sycl::range<2>{lines, width}, [=](cl::sycl::item<2> tid)
 			{
 			
-				
 				int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
 				int h = tid.get_id(1) + videoParameters.activeVideoStart;
 
-
 				unsigned short *temp;
 
-
+				//access approperate input frame field
 				if ((tid.get_id(0) % 2) == 0)
 				{
 					temp = accessInputDataOne.get_pointer();
@@ -404,24 +330,13 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 				{
 					temp = accessInputDataTwo.get_pointer();
 				}
-
-
-
-
-
 				
 				const unsigned short *line = temp + ((lineNum / 2) * videoParameters.fieldWidth);
 				bool linePhase = getLinePhase(lineNum, inputFieldOne.field.fieldPhaseID, inputFieldTwo.field.fieldPhaseID);
 
 
-				//double si = 0;
-				//double sq = 0;
-
-				//for (qint32 h = videoParameters.activeVideoStart; h < videoParameters.activeVideoEnd; h++) {
-
 				double si = 0;
 				double sq = 0;
-
 
 				int phase = h % 4;
 
@@ -437,82 +352,39 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 					cavgBefore = -cavgBefore;
 				}
 
-				//double si = 0;
-				//double sq = 0;
-
-				double comp = 0;//line[h];
+				double comp = 0;
 
 
 				switch (phase) {
 					case 0: sq = cavg; 
-					//comp = -sq;
 					break;
 					case 1: si = -cavg;
-					//comp = si; 
 					break;
 					case 2: sq = -cavg;
- 					//comp = sq;
 					break;
 					case 3: si = cavg;
- 					//comp = -si;
 					break;
 					default: break;
 				}
 
+				//here, calculating the phase of the previous pixel. 
+				//prevents needing additional buffer to access it
 				switch (phaseBefore) {
 					case 0: sq = cavgBefore; 
-					//comp = -sq;
 					break;
 					case 1: si = -cavgBefore; 
-					//comp = si;
 					break;
 					case 2: sq = -cavgBefore; 
-					//comp = sq;
 					break;
 					case 3: si = cavgBefore; 
-					//comp = -si;
 					break;
 					default: break;
 				}
-/*
 
-				double cavgBeforeArray[4];
-
-				cavgBeforeArray[0] = cavgBefore;
-				cavgBeforeArray[1] = -cavgBefore;
-				cavgBeforeArray[2] = -cavgBefore;
-				cavgBeforeArray[3] = cavgBefore;
-
-
-				if ((phase % 2) == 0)
-				{
-
-					sq = cavgBeforeArray[phase];	
-					si = cavg
-
-
-				}
-				else
-				{
-
-					si = cavgBeforeArray[phase];
-
-
-				}
-
-
-*/
-
-
-				//accessYIQ[lineNum][h].y = line[h];
-				//accessYIQ[lineNum][h].i = si;
-				//accessYIQ[lineNum][h].q = sq;
 
 				double i = si;
 				double q = sq;
 				
-
-				//double comp = 0;
 
 				switch (phase) {
 					case 0: comp = -sq; break;
@@ -522,34 +394,19 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 					default: break;
 				}
 
-
-/*
-				double accessComp[4];
-
-				accessComp[0] = -sq;
-				accessComp[1] = si;
-				accessComp[2] = sq;
-				accessComp[3] = -si;
-
-				comp = accessComp[phase];
-*/
-
 				if (!linePhase)
 				{
 					comp = -comp;
 				}
 
-				//sync();	
 
-
-				//accessYIQ[lineNum][h].y = line[h] - comp;
 				double y = line[h] - comp;
 
+
+				//here is the start of converting the final data to RGB
 				temp = accessOutput.get_pointer();
-
-
+				
 				unsigned short *pixelPointer = temp + (videoParameters.fieldWidth * 3 * lineNum) + (h * 3);
-
 
 				double yBlackLevel = videoParameters.black16bIre;
 				double yScale = 65535.0 / (videoParameters.white16bIre - videoParameters.black16bIre);
@@ -565,13 +422,6 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 					// This doesn't affect the chroma scaling.
 					yScale *= 125.0 / 100.0;
 				}
-
-
-
-
-				//double y = accessYIQ[lineNum][h].y;
-				//double i = accessYIQ[lineNum][h].i;
-				//double q = accessYIQ[lineNum][h].q;
 
 				// Scale the Y to 0-65535 where 0 = blackIreLevel and 65535 = whiteIreLevel
 				y = (y - yBlackLevel) * yScale;
@@ -601,7 +451,7 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 
 			});
 
-
+//this kernel was combined with other kernels and now is no longer needed on its own.
 /*
 			cgh.parallel_for<class adjustY>(cl::sycl::range<2>{lines, width}, [=](cl::sycl::item<2> tid)
 			{
@@ -636,42 +486,8 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 			});
 */
 
-/*
-			cgh.parallel_for<class doYNR>(cl::sycl::range<2>{lines, width}, [=](cl::sycl::item<2> tid)
-			{
 
-
-				int lineNum = tid.get_id(0) + videoParameters.firstActiveFrameLine;
-				int h = tid.get_id(1) + videoParameters.activeVideoStart;
-
-
-				// High-pass filter for Y
-				auto yFilter(f_nr);
-
-				// nr_y is the coring level
-				double nr_y = yNRLevel * irescale;
-
-				//yFilter.feed(23344);	
-
-				double a = yFilter.feed(accessYIQ[lineNum][h + 12].y);
-
-
-
-				if (cl::sycl::fabs(a) > nr_y) {
-					a = (a > 0) ? nr_y : -nr_y;
-				}
-
-
-				//accessYIQ[lineNum][h].y = a;//yFilter.a[1];//accessYIQ[lineNum][h].y;
-
-
-
-
-
-
-
-			});
-*/
+//this is the previous yiqToRGBFrame code used before it was combined with other kernels
 /*
 			cgh.parallel_for<class yiqToRgbFrame>(cl::sycl::range<2>{lines, width}, [=](cl::sycl::item<2> tid)
 			{
@@ -741,6 +557,8 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 
 */
 
+
+//kernel only used to move data from device to host side for testing purposes
 /*
 
 			cgh.parallel_for<class test>(cl::sycl::range<1>{1}, [=](cl::sycl::item<1> tid)
@@ -770,6 +588,8 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 		});
 
 	}
+
+//here is test code for verifying values
 /*
 	std::cout << "----------------------------- GPU DATA -----------------------" << std::endl;
 	std::cout << "value: " << testData[0] << std::endl;
@@ -784,11 +604,4 @@ void DecodeNTSC::decodeFrameGPU(const SourceField &inputFieldOne, const SourceFi
 */
 }
 
-/*
-void decodeFrameGPU(RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters)
-{
 
-
-}
-
-*/

@@ -42,12 +42,6 @@
 #include <iostream>
 #include <fstream>
 
-//#include <CL/cl.hpp>
-
-//#include <CL/sycl.hpp>
-
-//using namespace cl;
-
 #include "lddecodemetadata.h"
 
 
@@ -199,6 +193,8 @@ void PalColour::buildLookUpTables()
     //
     // We may wish to broaden vertical bandwidth *slightly* so as to better
     // pass one- or two-line colour bars - underlines/graphics etc.
+
+//this is required for CPU decoder, but for GPU values are hardcoded
 /*
     double cdiv = 0, ydiv = 0;
     for (qint32 f = 0; f <= FILTER_SIZE; f++) {
@@ -255,6 +251,7 @@ void PalColour::buildLookUpTables()
         }
     }
 */
+
 /*
 	for (qint32 f = 0; f <= FILTER_SIZE; f++) {
 	std::cout << std::endl << "cfilt: " << std::endl;
@@ -291,16 +288,7 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
         outputFrames[i].fill(0);
     }
 
-	//setupWaves(sine, cosine);
-
-
-	//DecodePAL::setupSine(sine, cosine);
-
 	DecodePAL decodeGPU(sine, cosine);
-
-	
-
-
 
     const double chromaGain = configuration.chromaGain;
     for (qint32 i = startIndex, j = 0, k = 0; i < endIndex; i += 2, j += 2, k++) {
@@ -308,13 +296,9 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
         //decodeField(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k]);
 
 		//std::cout << "-------------------------GPU------------------------" << std::endl;
-				//std::cout << typeid(videoParameters).name() << std::endl;
-		//decodeFieldGPU(inputFields[i], inputFields[i + 1], chromaData[j], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
-		
+				
 		decodeGPU.decodeFieldGPU(inputFields[i], inputFields[i + 1], chromaData[j], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
 
-
-		//decodeFieldGPU(inputFields[i + 1], chromaData[j + 1], chromaGain, outputFrames[k], videoParameters, sine, cosine, cfilt, yfilt);
 		//std::cout << "-------------------------CPU------------------------" << std::endl;
     }
 
@@ -325,10 +309,6 @@ void PalColour::decodeFrames(const QVector<SourceField> &inputFields, qint32 sta
     }
 }
 
-int numt = 0;
-int numtt = 0;
-int numttt = 0;
-int numtttt = 0;
 
 // Decode one field into outputFrame
 void PalColour::decodeField(const SourceField &inputField, const double *chromaData, double chromaGain, RGBFrame &outputFrame)
@@ -339,16 +319,6 @@ void PalColour::decodeField(const SourceField &inputField, const double *chromaD
     const qint32 firstLine = inputField.getFirstActiveLine(videoParameters);
     const qint32 lastLine = inputField.getLastActiveLine(videoParameters);
 
-	//std::cout << "start range: " << firstLine << std::endl;
-	//std::cout << "end range: " << lastLine << std::endl;
-
-	numt = 0;
-	numtt = 0;
-	numttt = 0;
-	numtttt = 0;
-
-	//std::cout << "Number of Lines::: " << lastLine - firstLine << std::endl;
-
 
     for (qint32 fieldLine = firstLine; fieldLine < lastLine; fieldLine++) {
         LineInfo line(fieldLine);
@@ -358,10 +328,8 @@ void PalColour::decodeField(const SourceField &inputField, const double *chromaD
 
         if (configuration.chromaFilter == palColourFilter) {
             // Decode chroma and luma from the composite signal
-		//std::cout << "type first" << std::endl;
             decodeLine<quint16, false>(inputField, compPtr, line, chromaGain, outputFrame);
         } else {
-		//std::cout << "type second" << std::endl;
             // Decode chroma and luma from the Transform PAL output
             decodeLine<double, true>(inputField, chromaData, line, chromaGain, outputFrame);
         }
@@ -393,16 +361,6 @@ void PalColour::detectBurst(LineInfo &line, const quint16 *inputData)
     in2 = (line.number + 1) >= videoParameters.fieldHeight ? blackLine : (inputData + ((line.number + 1) * videoParameters.fieldWidth));
     in3 = (line.number - 2) <  0                           ? blackLine : (inputData + ((line.number - 2) * videoParameters.fieldWidth));
     in4 = (line.number + 2) >= videoParameters.fieldHeight ? blackLine : (inputData + ((line.number + 2) * videoParameters.fieldWidth));
-
-	if (numt == 0)
-	//std::cout << "real value: " << *in0 << std::endl;
-
-numt = 1;
-
-
-//if (line.number == 22)
-	//std::cout << "line zero: " << in0[0] << std::endl;
-
 
 
     // Find absolute burst phase relative to the reference carrier by
@@ -455,13 +413,6 @@ numt = 1;
     line.bp /= burstNorm;
     line.bq /= burstNorm;
 
-
-
-	//if (line.number == 22)
-		//std::cout << "real bq num: " << line.bq << std::endl;
-
-
-
 }
 
 // Decode one line into outputFrame.
@@ -474,39 +425,8 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
 {
 	
 	
-	//boiler plate code here setting up to use the GPU.
-	//while working, it is very ineficient due to setting up the GPU
-	//and recompiling the kernel every line of frame. This
-	//only needs to be done once, but for proof of concept,
-	//is fine being here for now.
-	
-/*	
-	std::vector<Platform> platforms;
-	Platform::get(&platforms);
-
-	//platforms[0].
-
-	// Select the default platform and create a context using this platform and the GPU
-	cl_context_properties cps[3] = {
-		CL_CONTEXT_PLATFORM,
-		(cl_context_properties)(platforms[0])(),
-		0
-	};
-	Context context(CL_DEVICE_TYPE_GPU, cps);
-
-	// Get a list of devices on this platform
-	std::vector<Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
-
-	// Create a command queue and use the first device
-	CommandQueue queue = CommandQueue(context, devices[0]);
-*/	
-	
-	
-	
 	double m[4][MAX_WIDTH], n[4][MAX_WIDTH];
-	
-	
-	
+		
 	
     // Dummy black line, used when the filter needs to look outside the active region.
     static constexpr ChromaSample blackLine[MAX_WIDTH] = {0};
@@ -592,14 +512,6 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
             n[3][i] = -in5[i] * cosine[i] + in6[i] * cosine[i];
         }
 
-				if (numtt == 150)
-				{
-					//std::cout << "the M number: " << n[0][500] << std::endl;
-					numtt = 1;				
-				}
-
-				numtt++;
-
         // p & q should be sine/cosine components' amplitudes
         // NB: Multiline averaging/filtering assumes perfect
         //     inter-line phase registration...
@@ -640,17 +552,6 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
         }
     }
 
-		if (numttt == 0)
-		{
-			//std::cout << "REAL PU NUM: " << pu[200] << std::endl;
-			//std::cout << "REA: FILT NUM: " << yfilt[5][1] << std::endl;
-			numttt = 999;
-
-		}
-
-		numttt++;
-
-
 
     // Pointer to composite signal data
     const quint16 *comp = inputField.data.data() + (line.number * videoParameters.fieldWidth);
@@ -666,157 +567,7 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
     // extract the result with half its original amplitude, and with the
     // burst-based correction applied.
     const double scaledSaturation = 2.0 * scaledContrast * chromaGain;
-	
-/*	
-	//code compiling the kernel for use on the GPU.
-	
-	// Read source file
-	std::ifstream sourceFile("/home/duncan/Documents/github/ld-decode-GPU/tools/ld-chroma-decoder/calc_color.cl");
-	std::string sourceCode(
-		std::istreambuf_iterator<char>(sourceFile),
-		(std::istreambuf_iterator<char>()));
-	Program::Sources source(1, std::make_pair(sourceCode.c_str(), sourceCode.length() + 1));
 
-	// Make program of the source code in the context
-	Program program = Program(context, source);
-
-	// Build program for these specific devices
-	program.build(devices);
-
-	// Make kernel
-	Kernel kernel(program, "vector_calc_color");
-
-
-
-	int store = 0;	
-	int *prefilteredChroma;
-	
-	prefilteredChroma = &store;
-		
-	if (PREFILTERED_CHROMA)
-	{
-		(*prefilteredChroma) = 1;
-	}
-	else
-	{
-		(*prefilteredChroma) = 0;
-	}
-	
-	int arraySize = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
-	
-
-	//create buffers to transfer data to GPU
-	Buffer bufferSine = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-	Buffer bufferOutput = Buffer(context, CL_MEM_WRITE_ONLY, arraySize * sizeof(double));
-	Buffer bufferOutputFinal = Buffer(context, CL_MEM_WRITE_ONLY, arraySize * sizeof(unsigned short) * 3);
-	Buffer bufferCosine = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-	Buffer bufferPY = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-	Buffer bufferQY = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-	Buffer bufferPU = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-	Buffer bufferQU = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-	Buffer bufferQV = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-	Buffer bufferPV = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(double));
-	Buffer bufferComp = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(unsigned short));
-	Buffer bufferIn0 = Buffer(context, CL_MEM_READ_ONLY, arraySize * sizeof(unsigned short));
-
-
-
-
-	
-	//transfer data to the gpu
-	queue.enqueueWriteBuffer(bufferSine, CL_TRUE, 0, arraySize * sizeof(double), sine + videoParameters.activeVideoStart);
-	queue.enqueueWriteBuffer(bufferCosine, CL_TRUE, 0, arraySize * sizeof(double), cosine + videoParameters.activeVideoStart);
-	queue.enqueueWriteBuffer(bufferPY, CL_TRUE, 0, arraySize * sizeof(double), py + videoParameters.activeVideoStart);
-	queue.enqueueWriteBuffer(bufferQY, CL_TRUE, 0, arraySize * sizeof(double), qy + videoParameters.activeVideoStart);
-	
-	queue.enqueueWriteBuffer(bufferPU, CL_TRUE, 0, arraySize * sizeof(double), pu + videoParameters.activeVideoStart);
-	queue.enqueueWriteBuffer(bufferQU, CL_TRUE, 0, arraySize * sizeof(double), qu + videoParameters.activeVideoStart);
-	queue.enqueueWriteBuffer(bufferQV, CL_TRUE, 0, arraySize * sizeof(double), qv + videoParameters.activeVideoStart);
-	queue.enqueueWriteBuffer(bufferPV, CL_TRUE, 0, arraySize * sizeof(double), pv + videoParameters.activeVideoStart);
-
-	queue.enqueueWriteBuffer(bufferComp, CL_TRUE, 0, arraySize * sizeof(unsigned short), comp + videoParameters.activeVideoStart);
-	queue.enqueueWriteBuffer(bufferIn0, CL_TRUE, 0, arraySize * sizeof(unsigned short), in0 + videoParameters.activeVideoStart);
-
-
-
-	//double *test = sine + videoParameters.activeVideoStart;
-
-	//std::cout << "base value: "  << sine[videoParameters.activeVideoStart + 200] << std::endl;	
-	
-	//setup arguments for kernel function on gpu
-	//there should be much fewer arguments being send to the GPU later
-	//cause the whole frame of data to be decoded will be sent.
-	kernel.setArg(0, bufferSine);
-	kernel.setArg(1, bufferCosine);
-	kernel.setArg(2, bufferPY);
-	kernel.setArg(3, bufferQY);
-	
-	kernel.setArg(4, bufferPU);
-	kernel.setArg(5, bufferQU);
-	kernel.setArg(6, bufferQV);
-	kernel.setArg(7, bufferPV);
-	kernel.setArg(8, bufferComp);
-	kernel.setArg(9, bufferIn0);
-	
-	
-	//setting single variables
-	if (PREFILTERED_CHROMA)
-	{
-		kernel.setArg(10, 1);
-	}
-	else
-	{
-		kernel.setArg(10, 0);
-	}
-
-	kernel.setArg(11, videoParameters.black16bIre);
-	kernel.setArg(12, scaledContrast);
-	kernel.setArg(13, line.bp);
-	kernel.setArg(14, line.bq);
-	kernel.setArg(15, line.Vsw);
-	kernel.setArg(16, scaledSaturation);
-	
-	kernel.setArg(17, bufferOutput);
-	kernel.setArg(18, bufferOutputFinal);
-	
-	//setting work group sizes. Not likely to be set to the most efficient sizes at the moment.
-	NDRange global(arraySize);//LIST_SIZE
-	NDRange local(1);//1
-	queue.enqueueNDRangeKernel(kernel, NullRange, global, local);
-	
-	
-	//at the moment two arrays are copied out, one with the decoded data
-	//and another with every item in the array set to a set number
-	//this is because it is not always obvious if the kernel is crashing
-	//and testing the kernel is outputing a set value makes sure that it at least
-	//did not crash. for some reason on windows in visual studio it does alert me 
-	//if the kernel crashes. idk why not in linux.
-	
-	
-	
-	double *C = new double[arraySize];
-	queue.enqueueReadBuffer(bufferOutput, CL_TRUE, 0, arraySize * sizeof(double), C);
-	
-	//std::cout << C[20] << std::endl;
-	
-
-
-	//copying the decoded data out.
-	unsigned short *testOutput = new unsigned short[arraySize * 3];
-	queue.enqueueReadBuffer(bufferOutputFinal, CL_TRUE, 0, arraySize * sizeof(unsigned short) * 3, testOutput);
-
-	//std::cout << "new:" << std::endl;
-	//std::cout  << "Processed Output: "  << testOutput[203] << std::endl;
-	
-	//std::cout << "GPU rU" << C[20] << std::endl;
-
-	
-	//std::cout << "did not crash!!!" << std::endl;
-*/	
-	
-	//double rU = 0;;
-
-	//std::cout << "length: " << videoParameters.activeVideoEnd - videoParameters.activeVideoStart << std::endl;
 
     for (qint32 i = videoParameters.activeVideoStart; i < videoParameters.activeVideoEnd; i++) {
         // Compute luma by...
@@ -853,75 +604,8 @@ void PalColour::decodeLine(const SourceField &inputField, const ChromaSample *ch
         ptr[pp + 1] = static_cast<quint16>(G);
         ptr[pp + 2] = static_cast<quint16>(B);
 
-			
-/*
-				if (numtttt == 1)
-				{
 
-					if (i == videoParameters.activeVideoStart + 0)
-						{
-						
-							std::cout << "i is: " << i << std::endl;	
-							std::cout << "Real Red Pixel Value: " << R << std::endl;
-							std::cout << "Real Green Pixel Value: " << G << std::endl;
-							std::cout << "Real Blue Pixel Value: " << B << std::endl;
-							std::cout << "bp: " << line.bp << std::endl;
-							std::cout << "bq: " << line.bq << std::endl;
-							std::cout << "Vsw: " << line.Vsw << std::endl;
-							std::cout << "In0: " << in0[i] << std::endl;
-							std::cout << "In1: " << in1[i] << std::endl;
-							std::cout << "In2: " << in2[i] << std::endl;
-							std::cout << "In3: " << in3[i] << std::endl;
-							std::cout << "In4: " << in4[i] << std::endl;
-							std::cout << "In5: " << in5[i] << std::endl;
-							std::cout << "In6: " << in6[i] << std::endl;
-							std::cout << "M1: " << m[0][i] << std::endl;
-              std::cout << "M2: " << m[1][i] << std::endl;
-              std::cout << "M3: " << m[2][i] << std::endl;
-              std::cout << "M4: " << m[3][i] << std::endl;
-              std::cout << "N1: " << n[0][i] << std::endl;
-              std::cout << "N2: " << n[1][i] << std::endl;
-              std::cout << "N3: " << n[2][i] << std::endl;
-              std::cout << "N4: " << n[3][i] << std::endl;
-
-							std::cout << "pu: " << pu[i] << std::endl;
-              std::cout << "qu: " << qu[i] << std::endl;
-              std::cout << "pv: " << pv[i] << std::endl;
-              std::cout << "qv: " << qv[i] << std::endl;
-              std::cout << "py: " << py[i] << std::endl;
-              std::cout << "qy: " << qy[i] << std::endl;
-
-							std::cout << "Cfilt value: " << cfilt[6][1] << std::endl;;
-						
-							std::cout << "rU: " << rU << std::endl;
-							std::cout << "rV: " << rV << std::endl;
-							std::cout << "rY: " << rY << std::endl;
-							std::cout << "comp: " << line.number << std::endl;//was comp[0]
-									
-							numtttt = 999;
-						}
-
-				}
-
-*/
+							
 
     }
-
-
-	numtttt++;
-
-
-
-
-	//std::cout <<  "Proper Output: " << ptr[(videoParameters.activeVideoStart * 3) + 203] << std::endl;
-
-
-
-	//std::cout << "correct RU" << rU << std::endl;
-
-	//copy data gotten from GPU to output array
-	//std::copy(testOutput, testOutput + arraySize * 3, ptr + (videoParameters.activeVideoStart * 3));
-
-
-
 }

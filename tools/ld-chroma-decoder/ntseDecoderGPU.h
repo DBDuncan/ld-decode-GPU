@@ -11,6 +11,7 @@
 
 #include <CL/sycl.hpp>
 
+//struct needed to access configuration data.
      struct Configuration {
          double chromaGain = 1.0;
          bool colorlpf = false;
@@ -39,13 +40,13 @@ public:
 
 	void decodeFrameGPU(const SourceField &inputFieldOne, const SourceField &inputFieldTwo, RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters, double yNRLevel, double irescale, double chromaGain, bool whitePoint75);
 
-//void decodeFrameGPU(RGBFrame &outputFrame, const LdDecodeMetaData::VideoParameters &videoParameters);
 
 private:
 
+	//buffer is defined here to prevent it wasting resources being constructed and deconstructed when it can be reused due to it not accessing any data from host side directly.
 	cl::sycl::buffer<double, 2> bufClpBuffer2D{cl::sycl::range<2>(525, 910)};
 
-
+	//queue object to submit kernels to
 	cl::sycl::queue myQueue;
 
 };
