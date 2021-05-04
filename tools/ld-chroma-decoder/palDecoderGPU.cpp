@@ -620,6 +620,8 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 				// forward/backward axis slant.
 
 
+
+				//hardcoded filter values to increase performance
 				double accessYfilt[8][2] =
 				{
 					{0.0577985, 0.00517164},
@@ -723,7 +725,7 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 			
 
 			
-
+				//here, is the start of final convertion to RGB values
 				int lineNumber = (int)tid.get_id(0) / 2;
 				lineNum = lineNumber;
 				int linePixel = tid.get_id(1) + accessVideoPara[0].activeVideoStart;
@@ -861,7 +863,7 @@ void DecodePAL::decodeFieldGPU(const SourceField &inputField, const SourceField 
 	}
 	//end of scope, buffers are deconstructed here and transfer their data back to the host as appropriate
 
-	const size_t lineWidth = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
+	//const size_t lineWidth = videoParameters.activeVideoEnd - videoParameters.activeVideoStart;
 
 
 	//test outputs for verifying decoding
